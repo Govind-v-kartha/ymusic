@@ -36,6 +36,8 @@ sentry {
 }
 
 val appVersionName = appVersionName()
+val ciRunNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+val appVersionCode = if (ciRunNumber != null) 100000 + ciRunNumber else 18
 
 // Outputs read YMusic-<versionName>-<abi>-release.apk.
 base { archivesName.set("YMusic-$appVersionName") }
@@ -56,7 +58,7 @@ android {
         applicationId = "io.ymusic.android"
         minSdk = Versions.minSdk
         targetSdk = Versions.targetSdk
-        versionCode = 18
+        versionCode = appVersionCode
         versionName = appVersionName
         buildConfigField("String", "SENTRY_DSN", "\"${sentryDsn()}\"")
         buildConfigField("String", "GIT_COMMIT", "\"${gitCommit()}\"")
@@ -100,11 +102,16 @@ android {
             applicationIdSuffix = ".debug"
         }
         release {
+            applicationIdSuffix = ".personal"
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // Without android.signing.* the release build is debug-signed: installable for
             // on-device testing, never distributable.
+            val enforceSigning = System.getenv("ENFORCE_RELEASE_SIGNING") == "true"
+            if (enforceSigning && releaseSigning == null) {
+                throw GradleException("Release signing is enforced but YMUSIC_ANDROID_* is not configured or keystore is missing.")
+            }
             signingConfig = releaseSigning ?: signingConfigs.getByName("debug")
         }
     }

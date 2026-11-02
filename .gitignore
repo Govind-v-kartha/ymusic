@@ -11,7 +11,9 @@ temp
 kmpHttp/core/test-cache
 kmpHttp/test/test-cache
 design
-docs
+!docs/
+docs/*
+!docs/*.md
 scripts
 tools
 test-cache
@@ -69,4 +71,6 @@ gradle/gradle-daemon-jvm.properties
 *.p8
 *.cer
 *.mobileprovision
+*.jks
+*.keystore
 spikes/ios-mse-lab

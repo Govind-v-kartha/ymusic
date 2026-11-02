@@ -1,0 +1,145 @@
+name: release-personal
+
+on:
+  push:
+    tags: ['v*-personal.*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-personal-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FFMPEG_BUILD_REPO: ymusic-io/ffmpeg-build
+  FFMPEG_BUILD_REF: d0a89492c442dbca24dfabd044b866299f0a97b1
+  NDK_VERSION: 28.2.13676358
+
+jobs:
+  ffmpeg-android:
+    name: ffmpeg android-${{ matrix.abi }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
+    steps:
+      - id: cache
+        uses: actions/cache@v4
+        with:
+          path: ffmpeg-build/out/android-${{ matrix.abi }}
+          key: ffmpeg-android-${{ matrix.abi }}-${{ env.FFMPEG_BUILD_REF }}-ndk${{ env.NDK_VERSION }}
+
+      - if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.FFMPEG_BUILD_REPO }}
+          ref: ${{ env.FFMPEG_BUILD_REF }}
+          path: ffmpeg-build
+          submodules: recursive
+          fetch-depth: 1
+
+      - if: steps.cache.outputs.cache-hit != 'true'
+        name: Install NDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" > /dev/null
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+
+      - if: steps.cache.outputs.cache-hit != 'true'
+        working-directory: ffmpeg-build
+        run: |
+          sudo apt-get update && sudo apt-get install -y nasm automake autoconf libtool pkg-config patchelf
+          scripts/build-android.sh "${{ matrix.abi }}"
+
+  build-android:
+    name: Build & Release Personal APKs
+    needs: ffmpeg-android
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: YMusicV4
+
+      - name: Restore ffmpeg android-arm64-v8a
+        uses: actions/cache/restore@v4
+        with:
+          path: ffmpeg-build/out/android-arm64-v8a
+          key: ffmpeg-android-arm64-v8a-${{ env.FFMPEG_BUILD_REF }}-ndk${{ env.NDK_VERSION }}
+          fail-on-cache-miss: true
+
+      - name: Restore ffmpeg android-armeabi-v7a
+        uses: actions/cache/restore@v4
+        with:
+          path: ffmpeg-build/out/android-armeabi-v7a
+          key: ffmpeg-android-armeabi-v7a-${{ env.FFMPEG_BUILD_REF }}-ndk${{ env.NDK_VERSION }}
+          fail-on-cache-miss: false
+
+      - name: Restore ffmpeg android-x86_64
+        uses: actions/cache/restore@v4
+        with:
+          path: ffmpeg-build/out/android-x86_64
+          key: ffmpeg-android-x86_64-${{ env.FFMPEG_BUILD_REF }}-ndk${{ env.NDK_VERSION }}
+          fail-on-cache-miss: false
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install NDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" > /dev/null
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+
+      - name: Validate and Prepare Signing Keystore
+        working-directory: YMusicV4
+        run: |
+          if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ] || [ -z "${{ secrets.KEYSTORE_PASSWORD }}" ] || [ -z "${{ secrets.KEY_ALIAS }}" ] || [ -z "${{ secrets.KEY_PASSWORD }}" ]; then
+            echo "::error::Release signing secrets missing! Required: KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD"
+            exit 1
+          fi
+          mkdir -p signing
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > signing/release.jks
+          if [ ! -s signing/release.jks ]; then
+            echo "::error::Keystore decode resulted in an empty file."
+            exit 1
+          fi
+
+      - name: Assemble Release APKs
+        working-directory: YMusicV4
+        env:
+          YMUSIC_ANDROID_STORE_FILE: signing/release.jks
+          YMUSIC_ANDROID_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          YMUSIC_ANDROID_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          YMUSIC_ANDROID_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          ENFORCE_RELEASE_SIGNING: "true"
+        run: ./gradlew :androidApp:assembleRelease
+
+      - name: Wipe Keystore
+        if: always()
+        working-directory: YMusicV4
+        run: rm -rf signing
+
+      - name: Create GitHub Release
+        working-directory: YMusicV4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="v-manual-${{ github.run_number }}"
+            git tag "$TAG_NAME"
+            git push origin "$TAG_NAME"
+          fi
+          gh release create "$TAG_NAME" \
+            androidApp/build/outputs/apk/release/*.apk \
+            --title "Personal Release $TAG_NAME" \
+            --notes "Personal release build with no-repeat + anti-spam feature."

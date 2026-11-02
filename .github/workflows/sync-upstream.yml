@@ -1,0 +1,53 @@
+name: sync-upstream
+
+# Automatically syncs changes from upstream/master to fork's master and feature/no-repeat.
+# Note: GITHUB_TOKEN permissions do not allow pushing workflow file changes (.github/workflows/*).
+# If upstream modifies workflows, the automated push will be rejected and manual sync is required.
+
+on:
+  schedule:
+    - cron: '0 3 * * *' # Daily at 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Sync Upstream Master
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git Bot Identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add Upstream Remote and Fetch
+        run: |
+          git remote add upstream https://github.com/ymusic-io/YMusicV4.git || git remote set-url upstream https://github.com/ymusic-io/YMusicV4.git
+          git fetch upstream master
+
+      - name: Fast-forward master to upstream/master
+        run: |
+          git checkout master
+          git merge --ff-only upstream/master || {
+            echo "::error::Master branch cannot be fast-forwarded to upstream/master."
+            exit 1
+          }
+          git push origin master
+
+      - name: Merge master into feature/no-repeat
+        run: |
+          git checkout feature/no-repeat
+          if ! git merge master -m "Merge upstream/master into feature/no-repeat"; then
+            echo "::error::Merge conflict detected between master and feature/no-repeat! Aborting merge."
+            git merge --abort
+            exit 1
+          fi
+          git push origin feature/no-repeat

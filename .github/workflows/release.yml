@@ -27,6 +27,7 @@ jobs:
   # The checkouts sit side by side (YMusicV4/ + ffmpeg-build/): the Gradle build reads
   # ../ffmpeg-build/out/<slug>, exactly as on a developer machine.
   ffmpeg:
+    if: github.repository == 'ymusic-io/YMusicV4'
     name: ffmpeg ${{ matrix.slug }}
     runs-on: ${{ matrix.runner }}
     strategy:
