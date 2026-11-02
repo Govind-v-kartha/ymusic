@@ -8,7 +8,6 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class RepeatPolicyTest {
@@ -322,5 +321,143 @@ class RepeatPolicyTest {
         // At dt = 1 millisecond later: exp(-1 / 3600000) = 0.9999997 < 1.0 (eligible!)
         val fatigueJustAfter = policy.calculateFatigue("vid_test", now + 1L, tauHours)
         assertTrue(fatigueJustAfter < 1.0)
+    }
+
+    @Test
+    fun rested_item_excluded_from_selection_even_when_off() {
+        val policy = RepeatPolicyImpl(Random(42))
+        policy.initSnapshot(emptyMap())
+
+        val now = 10_000_000L
+        policy.restItem("vid_0", now + 3600_000L)
+
+        val items = listOf(ytItem("vid_0"), ytItem("vid_1"))
+        val candidates = listOf(0, 1)
+
+        // Linear mode with noRepeatHours = 0 (Off)
+        val selectedLinear = policy.selectNextIndex(
+            candidates = candidates,
+            items = items,
+            currentIndex = 0,
+            noRepeatHours = 0,
+            allowScoreReordering = false,
+            now = now,
+        )
+        assertEquals(1, selectedLinear)
+
+        // Shuffle mode with noRepeatHours = 3
+        val selectedShuffle = policy.selectNextIndex(
+            candidates = candidates,
+            items = items,
+            currentIndex = 0,
+            noRepeatHours = 3,
+            allowScoreReordering = true,
+            now = now,
+        )
+        assertEquals(1, selectedShuffle)
+    }
+
+    @Test
+    fun expired_rest_restores_eligibility() {
+        val policy = RepeatPolicyImpl(Random(42))
+        policy.initSnapshot(emptyMap())
+
+        val now = 10_000_000L
+        val restDuration = 3600_000L
+        policy.restItem("vid_0", now + restDuration)
+
+        assertTrue(policy.isRested("vid_0", now))
+        assertTrue(policy.isRested("vid_0", now + restDuration - 1L))
+        assertFalse(policy.isRested("vid_0", now + restDuration + 1L))
+
+        val items = listOf(ytItem("vid_0"), ytItem("vid_1"))
+        val selected = policy.selectNextIndex(
+            candidates = listOf(0, 1),
+            items = items,
+            currentIndex = 1,
+            noRepeatHours = 0,
+            allowScoreReordering = false,
+            now = now + restDuration + 1L,
+        )
+        assertEquals(0, selected)
+    }
+
+    @Test
+    fun manual_play_clears_rest() {
+        val policy = RepeatPolicyImpl(Random(42))
+        policy.initSnapshot(emptyMap())
+
+        val now = 10_000_000L
+        policy.restItem("vid_0", now + 3600_000L)
+        assertTrue(policy.isRested("vid_0", now))
+
+        policy.clearRest("vid_0")
+        assertFalse(policy.isRested("vid_0", now))
+
+        val items = listOf(ytItem("vid_0"), ytItem("vid_1"))
+        val selected = policy.selectNextIndex(
+            candidates = listOf(0, 1),
+            items = items,
+            currentIndex = 1,
+            noRepeatHours = 0,
+            allowScoreReordering = false,
+            now = now,
+        )
+        assertEquals(0, selected)
+    }
+
+    @Test
+    fun all_candidates_rested_picks_earliest_rest_until() {
+        val policy = RepeatPolicyImpl(Random(42))
+        policy.initSnapshot(emptyMap())
+
+        val now = 10_000_000L
+        policy.restItem("vid_0", now + 3 * 3600_000L)
+        policy.restItem("vid_1", now + 1 * 3600_000L) // Earliest!
+        policy.restItem("vid_2", now + 12 * 3600_000L)
+
+        val items = listOf(ytItem("vid_0"), ytItem("vid_1"), ytItem("vid_2"))
+        var fallbackCalled = false
+
+        val selected = policy.selectNextIndex(
+            candidates = listOf(0, 1, 2),
+            items = items,
+            currentIndex = 0,
+            noRepeatHours = 3,
+            allowScoreReordering = false,
+            now = now,
+            onFallbackNotice = { fallbackCalled = true },
+        )
+
+        assertEquals(1, selected) // vid_1 has earliest restUntil
+        assertTrue(fallbackCalled)
+    }
+
+    @Test
+    fun rest_survives_snapshot_reload() {
+        val policy = RepeatPolicyImpl(Random(42))
+        val now = 10_000_000L
+
+        val snapshot = mapOf(
+            "vid_rested" to listOf(
+                RepeatEvent(playedAt = now, weight = 0.0, restUntil = now + 5000L),
+            ),
+        )
+        policy.initSnapshot(snapshot)
+
+        assertTrue(policy.isRested("vid_rested", now + 1000L))
+        assertEquals(now + 5000L, policy.restUntil("vid_rested", now + 1000L))
+        assertFalse(policy.isRested("vid_rested", now + 6000L))
+    }
+    @Test
+    fun rest_does_not_create_phantom_play_event() {
+        val policy = RepeatPolicyImpl(Random(42))
+        policy.initSnapshot(emptyMap())
+
+        val now = 10_000_000L
+        policy.restItem("vid_0", now + 3600_000L)
+
+        // Rested item has weight 0.0 and was not played; hasEventInWindow must be false
+        assertFalse(policy.hasEventInWindow("vid_0", 3600_000L, now))
     }
 }

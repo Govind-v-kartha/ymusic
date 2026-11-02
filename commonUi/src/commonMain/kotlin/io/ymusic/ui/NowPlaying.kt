@@ -67,11 +67,13 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Equalizer
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lyrics
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Snooze
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -196,7 +198,9 @@ import io.ymusic.ui.resources.menu_add_to_playlist
 import io.ymusic.ui.resources.menu_details_comments
 import io.ymusic.ui.resources.menu_go_to_album
 import io.ymusic.ui.resources.menu_go_to_artist
+import io.ymusic.ui.resources.menu_no_repeat_window
 import io.ymusic.ui.resources.menu_reload_player
+import io.ymusic.ui.resources.menu_rest_song
 import io.ymusic.ui.resources.menu_search_lyrics
 import io.ymusic.ui.resources.menu_speed_pitch
 import io.ymusic.ui.resources.menu_start_radio
@@ -222,6 +226,7 @@ import io.ymusic.ui.resources.signin_button
 import io.ymusic.ui.resources.sound_eq
 import io.ymusic.ui.resources.sponsor_block_excluded
 import io.ymusic.ui.resources.sponsor_block_included
+import io.ymusic.ui.resources.toast_resting_song
 import io.ymusic.ui.resources.up_next
 import io.ymusic.ui.resources.video_quality_auto
 import io.ymusic.ui.resources.yt_playlist_queue_empty
@@ -1445,8 +1450,12 @@ private fun PlayerMoreMenu(coordinator: PlaybackCoordinator) {
     val noVideos = stringResource(Res.string.yt_playlist_queue_empty)
     val scope = rememberCoroutineScope()
     var tracksOpen by remember { mutableStateOf(false) }
+    var noRepeatOpen by remember { mutableStateOf(false) }
+    var restOpen by remember { mutableStateOf(false) }
+    val noRepeatHours by remember(coordinator.graph) { coordinator.graph.settings.flow(AppSettings.noRepeatHours) }.collectAsState()
+    val currentNoRepeatOption = NoRepeatOptions.firstOrNull { it.first == noRepeatHours } ?: NoRepeatOptions.first()
     val config by player.config.collectAsState()
-    HoldVideoOverlay(open || tracksOpen || playbackOpen || eqOpen || detailsOpen)
+    HoldVideoOverlay(open || tracksOpen || playbackOpen || eqOpen || detailsOpen || noRepeatOpen || restOpen)
 
     Box {
         ActionIcon(Icons.Default.MoreVert, stringResource(Res.string.cd_more), onClick = { open = true })
@@ -1513,6 +1522,26 @@ private fun PlayerMoreMenu(coordinator: PlaybackCoordinator) {
                     open = false
                 }
             }
+            MoreMenuItem(
+                Icons.Outlined.History,
+                stringResource(Res.string.menu_no_repeat_window),
+                value = stringResource(currentNoRepeatOption.second),
+                submenu = true,
+            ) {
+                noRepeatOpen = true
+                open = false
+            }
+            val restKey = current?.repeatKey?.takeIf { it.isNotBlank() }
+            if (restKey != null) {
+                MoreMenuItem(
+                    Icons.Outlined.Snooze,
+                    stringResource(Res.string.menu_rest_song),
+                    submenu = true,
+                ) {
+                    restOpen = true
+                    open = false
+                }
+            }
             MoreMenuDivider()
             MoreMenuItem(Icons.Outlined.Refresh, stringResource(Res.string.menu_reload_player)) {
                 player.reload()
@@ -1533,6 +1562,42 @@ private fun PlayerMoreMenu(coordinator: PlaybackCoordinator) {
                     trailingIcon = selectedCheck(selected),
                     onClick = { player.selectAudioTrack(track.id); tracksOpen = false },
                     modifier = Modifier.menuChoice(selected),
+                )
+            }
+        }
+        DropdownMenu(expanded = noRepeatOpen, onDismissRequest = { noRepeatOpen = false }, modifier = Modifier.width(MoreMenuWidth)) {
+            NoRepeatOptions.forEach { (value, labelRes) ->
+                val selected = value == noRepeatHours
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            stringResource(labelRes),
+                            color = if (selected) DesignColors.Accent else DesignColors.Ink,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        )
+                    },
+                    trailingIcon = selectedCheck(selected),
+                    onClick = {
+                        noRepeatOpen = false
+                        scope.launch { coordinator.graph.settings.put(AppSettings.noRepeatHours, value) }
+                    },
+                    modifier = Modifier.menuChoice(selected),
+                )
+            }
+        }
+        DropdownMenu(expanded = restOpen, onDismissRequest = { restOpen = false }, modifier = Modifier.width(MoreMenuWidth)) {
+            RestOptions.forEach { (durationMs, labelRes) ->
+                val durationLabel = stringResource(labelRes)
+                val toastMessage = stringResource(Res.string.toast_resting_song, durationLabel)
+                DropdownMenuItem(
+                    text = { Text(durationLabel) },
+                    onClick = {
+                        restOpen = false
+                        current?.let { item ->
+                            coordinator.restItem(item, durationMs)
+                            snackbar(toastMessage)
+                        }
+                    },
                 )
             }
         }
@@ -1951,7 +2016,10 @@ private fun QueueRowContent(
             )
             .then(if (current) Modifier.background(DesignColors.Accent.copy(alpha = 0.1f)) else Modifier)
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
-            .clickable(role = Role.Button, onClickLabel = playLabel) { coordinator.player.playAt(index) }
+            .clickable(role = Role.Button, onClickLabel = playLabel) {
+                coordinator.clearRepeatRest(item.repeatKey)
+                coordinator.player.playAt(index)
+            }
             .a11yActionLabel(label)
             .padding(horizontal = 16.dp, vertical = if (large) 10.dp else 8.dp),
         horizontalArrangement = Arrangement.spacedBy(if (large) 12.dp else 8.dp),

@@ -819,4 +819,8 @@
     <string name="settings_no_repeat_12h">12 hours</string>
     <string name="settings_no_repeat_24h">24 hours</string>
     <string name="player_no_repeat_queue_exhausted">Repeat limits relaxed to keep playing.</string>
+    <string name="menu_no_repeat_window">No-repeat window</string>
+    <string name="menu_rest_song">Rest this song</string>
+    <string name="no_repeat_chip">No repeat: %1$s</string>
+    <string name="toast_resting_song">Resting this song for %1$s</string>
 </resources>

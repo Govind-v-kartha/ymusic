@@ -15,15 +15,68 @@ class RepeatPolicyImpl(
 
     private val lock = SynchronizedObject()
     private val snapshot = mutableMapOf<String, MutableList<RepeatEvent>>()
+    private val restedUntil = mutableMapOf<String, Long>()
     private val recentAutoPlays = ArrayDeque<String>(RepeatConfig.RECENT_BUFFER_CAPACITY)
 
     override fun initSnapshot(snapshot: Map<String, List<RepeatEvent>>) {
         synchronized(lock) {
             this.snapshot.clear()
+            this.restedUntil.clear()
             snapshot.forEach { (key, events) ->
                 this.snapshot[key] = events.toMutableList()
+                val activeRest = events.mapNotNull { it.restUntil }.maxOrNull()
+                if (activeRest != null) {
+                    this.restedUntil[key] = activeRest
+                }
             }
             isReady = true
+        }
+    }
+
+    override fun restItem(key: String, restUntil: Long) {
+        if (key.isBlank()) return
+        synchronized(lock) {
+            this.restedUntil[key] = restUntil
+        }
+    }
+
+    override fun clearRest(key: String) {
+        if (key.isBlank()) return
+        synchronized(lock) {
+            this.restedUntil.remove(key)
+            snapshot[key]?.let { list ->
+                list.removeAll { it.weight == 0.0 }
+                for (i in list.indices) {
+                    val e = list[i]
+                    if (e.restUntil != null) {
+                        list[i] = e.copy(restUntil = null)
+                    }
+                }
+            }
+        }
+    }
+
+    override fun isRested(key: String, now: Long): Boolean {
+        synchronized(lock) {
+            val until = restedUntil[key] ?: return false
+            return if (until > now) {
+                true
+            } else {
+                restedUntil.remove(key)
+                false
+            }
+        }
+    }
+
+    override fun restUntil(key: String, now: Long): Long? {
+        synchronized(lock) {
+            val until = restedUntil[key] ?: return null
+            return if (until > now) {
+                until
+            } else {
+                restedUntil.remove(key)
+                null
+            }
         }
     }
 
@@ -47,7 +100,7 @@ class RepeatPolicyImpl(
         synchronized(lock) {
             val events = snapshot[key] ?: return false
             val minTime = now - windowMs
-            return events.any { it.playedAt >= minTime }
+            return events.any { it.playedAt >= minTime && it.weight > 0.0 }
         }
     }
 
@@ -66,7 +119,8 @@ class RepeatPolicyImpl(
 
         val currentArtist = items.getOrNull(currentIndex)?.artistName?.trim()
 
-        synchronized(lock) {
+        var fallbackTriggered = false
+        val selected = synchronized(lock) {
             // Level 0: Full policy (minGap = 10, fatigue active, artist penalty active)
             evaluateLadder(
                 candidates = candidates,
@@ -79,7 +133,7 @@ class RepeatPolicyImpl(
                 allowScoreReordering = allowScoreReordering,
                 isExempt = isExempt,
                 now = now,
-            )?.let { return it }
+            )?.let { return@synchronized it }
 
             // Level 1: Drop artist penalty
             evaluateLadder(
@@ -93,7 +147,7 @@ class RepeatPolicyImpl(
                 allowScoreReordering = allowScoreReordering,
                 isExempt = isExempt,
                 now = now,
-            )?.let { return it }
+            )?.let { return@synchronized it }
 
             // Level 2: Drop scoring to plain order (no score reordering even in shuffle)
             evaluateLadder(
@@ -107,7 +161,7 @@ class RepeatPolicyImpl(
                 allowScoreReordering = false,
                 isExempt = isExempt,
                 now = now,
-            )?.let { return it }
+            )?.let { return@synchronized it }
 
             // Level 3: Reduce minGap to 5
             evaluateLadder(
@@ -121,7 +175,7 @@ class RepeatPolicyImpl(
                 allowScoreReordering = false,
                 isExempt = isExempt,
                 now = now,
-            )?.let { return it }
+            )?.let { return@synchronized it }
 
             // Level 4: Ignore hours window (fatigue disabled, minGap relaxed)
             evaluateLadder(
@@ -136,18 +190,31 @@ class RepeatPolicyImpl(
                 isExempt = isExempt,
                 now = now,
             )?.let {
-                onFallbackNotice?.invoke()
-                return it
+                fallbackTriggered = true
+                return@synchronized it
             }
 
-            // Level 5: Oldest played item among candidates (never stall playback)
-            onFallbackNotice?.invoke()
-            return candidates.minByOrNull { idx ->
-                val key = items[idx].repeatKey
-                val events = snapshot[key]
-                events?.maxOfOrNull { it.playedAt } ?: Long.MIN_VALUE
-            } ?: candidates.first()
+            // Level 5: When nothing else is eligible (never stall playback)
+            fallbackTriggered = true
+            val nonRested = candidates.filterNot { isRested(items[it].repeatKey, now) }
+            if (nonRested.isNotEmpty()) {
+                nonRested.minByOrNull { idx ->
+                    val key = items[idx].repeatKey
+                    val events = snapshot[key]
+                    events?.filter { it.weight > 0.0 }?.maxOfOrNull { it.playedAt } ?: Long.MIN_VALUE
+                } ?: nonRested.first()
+            } else {
+                candidates.minByOrNull { idx ->
+                    val key = items[idx].repeatKey
+                    restedUntil[key] ?: Long.MAX_VALUE
+                } ?: candidates.first()
+            }
         }
+
+        if (fallbackTriggered) {
+            onFallbackNotice?.invoke()
+        }
+        return selected
     }
 
     private fun evaluateLadder(
@@ -177,6 +244,7 @@ class RepeatPolicyImpl(
             }
 
             val key = item.repeatKey
+            if (isRested(key, now)) continue
             if (key in recentGapSet) continue
 
             val fatigue = if (checkFatigue && tauHours > 0) calculateFatigue(key, now, tauHours) else 0.0

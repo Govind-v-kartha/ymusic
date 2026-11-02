@@ -18,6 +18,18 @@ interface RepeatPolicy {
     /** Returns true if [key] has any recorded event in the past [windowMs] before [now]. */
     fun hasEventInWindow(key: String, windowMs: Long, now: Long): Boolean
 
+    /** Sets a rest-until timestamp for [key]. */
+    fun restItem(key: String, restUntil: Long)
+
+    /** Clears active rest for [key], nulling restUntil without deleting play history. */
+    fun clearRest(key: String)
+
+    /** Returns true if [key] is currently rested at [now]. */
+    fun isRested(key: String, now: Long): Boolean
+
+    /** Returns the active rest timestamp for [key] if any and not expired at [now]. */
+    fun restUntil(key: String, now: Long): Long?
+
     /**
      * Filters and selects the next item index from [candidates].
      *

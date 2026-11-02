@@ -3,9 +3,9 @@ package io.ymusic.ui.playhistory
 import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlDriver
 import io.ymusic.dynamicengine.yt.YtFeedItem
-import io.ymusic.player.repeat.RepeatEvent
 import io.ymusic.dynamicengine.yt.YtThumb
 import io.ymusic.mediastore.model.MediaStoreItem
+import io.ymusic.player.repeat.RepeatEvent
 import io.ymusic.ui.youtubeThumbUrl
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -273,6 +273,7 @@ class PlayHistoryStore(
     }
 
     suspend fun insertRepeatEvent(itemKey: String, playedAt: Long, weight: Double) {
+        if (itemKey.isBlank()) return
         withContext(io) {
             driver.execute(
                 null,
@@ -286,32 +287,74 @@ class PlayHistoryStore(
         }
     }
 
-    suspend fun loadRecentRepeatEvents(sinceMs: Long): Map<String, List<RepeatEvent>> =
+    suspend fun insertRepeatRest(itemKey: String, playedAt: Long, restUntil: Long) {
+        if (itemKey.isBlank()) return
+        withContext(io) {
+            driver.execute(
+                null,
+                "INSERT INTO repeat_events (item_key, played_at, weight, rest_until) VALUES (?, ?, 0.0, ?)",
+                3,
+            ) {
+                bindString(0, itemKey)
+                bindLong(1, playedAt)
+                bindLong(2, restUntil)
+            }
+        }
+    }
+
+    suspend fun clearRepeatRest(itemKey: String) {
+        if (itemKey.isBlank()) return
+        withContext(io) {
+            driver.execute(
+                null,
+                "DELETE FROM repeat_events WHERE item_key = ? AND weight = 0.0",
+                1,
+            ) {
+                bindString(0, itemKey)
+            }
+            driver.execute(
+                null,
+                "UPDATE repeat_events SET rest_until = NULL WHERE item_key = ? AND weight > 0.0",
+                1,
+            ) {
+                bindString(0, itemKey)
+            }
+        }
+    }
+
+    suspend fun loadRecentRepeatEvents(sinceMs: Long, nowMs: Long = now()): Map<String, List<RepeatEvent>> =
         withContext(io) {
             driver.executeQuery(
                 null,
-                "SELECT item_key, played_at, weight FROM repeat_events WHERE played_at >= ? ORDER BY played_at ASC",
+                "SELECT item_key, played_at, weight, rest_until FROM repeat_events WHERE played_at >= ? OR (rest_until IS NOT NULL AND rest_until > ?) ORDER BY played_at ASC",
                 { cursor ->
                     val map = mutableMapOf<String, MutableList<RepeatEvent>>()
                     while (cursor.next().value) {
                         val key = cursor.getString(0)!!
                         val playedAt = cursor.getLong(1)!!
                         val weight = cursor.getDouble(2)!!
-                        map.getOrPut(key) { mutableListOf() }.add(RepeatEvent(playedAt, weight))
+                        val restUntil = cursor.getLong(3)
+                        map.getOrPut(key) { mutableListOf() }.add(RepeatEvent(playedAt, weight, restUntil))
                     }
                     QueryResult.Value(map)
                 },
-                1,
-            ) { bindLong(0, sinceMs) }.value
+                2,
+            ) {
+                bindLong(0, sinceMs)
+                bindLong(1, nowMs)
+            }.value
         }
 
-    suspend fun pruneRepeatEvents(olderThanMs: Long) {
+    suspend fun pruneRepeatEvents(olderThanMs: Long, nowMs: Long = now()) {
         withContext(io) {
             driver.execute(
                 null,
-                "DELETE FROM repeat_events WHERE played_at < ?",
-                1,
-            ) { bindLong(0, olderThanMs) }
+                "DELETE FROM repeat_events WHERE played_at < ? AND (rest_until IS NULL OR rest_until < ?)",
+                2,
+            ) {
+                bindLong(0, olderThanMs)
+                bindLong(1, nowMs)
+            }
         }
     }
 

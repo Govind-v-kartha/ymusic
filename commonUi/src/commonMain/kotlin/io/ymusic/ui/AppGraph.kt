@@ -7,14 +7,10 @@ import io.ymusic.dynamicengine.DynamicEngineManager
 import io.ymusic.imageloader.ImageLoader
 import io.ymusic.mediastore.BetterMediaStore
 import io.ymusic.player.LoopMode
-import io.ymusic.player.repeat.RepeatConfig
-import io.ymusic.player.repeat.RepeatPolicyImpl
-import io.ymusic.ui.resources.Res
-import io.ymusic.ui.resources.player_no_repeat_queue_exhausted
-import kotlin.time.Clock
-import org.jetbrains.compose.resources.getString
 import io.ymusic.player.PlayableItem
 import io.ymusic.player.Player
+import io.ymusic.player.repeat.RepeatConfig
+import io.ymusic.player.repeat.RepeatPolicyImpl
 import io.ymusic.remoteconfig.ApiService
 import io.ymusic.remoteconfig.RemoteConfigData
 import io.ymusic.remoteconfig.StatUsage
@@ -26,6 +22,8 @@ import io.ymusic.settings.mapState
 import io.ymusic.settings.put
 import io.ymusic.ui.playhistory.PlayAgainRecorder
 import io.ymusic.ui.playhistory.PlayHistoryStore
+import io.ymusic.ui.resources.Res
+import io.ymusic.ui.resources.player_no_repeat_queue_exhausted
 import io.ymusic.ui.sponsorblock.InMemorySponsorBlockStore
 import io.ymusic.ui.sponsorblock.ServiceSponsorBlockApi
 import io.ymusic.ui.sponsorblock.SponsorBlockApi
@@ -43,6 +41,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.getString
+import kotlin.time.Clock
 
 /** The player-quality settings key — public because shell settings stores (iOS NSUserDefaults
  *  seeding) enumerate the keys they persist. */

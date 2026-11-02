@@ -1,8 +1,6 @@
 package io.ymusic.ui
 
 import io.ymusic.dynamicengine.yt.YtFeedItem
-import io.ymusic.player.repeat.RepeatConfig
-import kotlin.time.Clock
 import io.ymusic.dynamicengine.yt.YtThumb
 import io.ymusic.mediastore.model.MediaStoreItem
 import io.ymusic.player.PlayableItem
@@ -12,6 +10,7 @@ import io.ymusic.player.PlaybackStatus
 import io.ymusic.player.Player
 import io.ymusic.player.PlayerError
 import io.ymusic.player.QueueSource
+import io.ymusic.player.repeat.RepeatConfig
 import io.ymusic.ui.playhistory.PlayAgainSession
 import kmpcommon.log.Logger
 import kmpcommon.log.info
@@ -24,6 +23,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import projectcommon.error.TechnicalException
+import kotlin.time.Clock
 import kotlin.time.TimeSource
 
 /**
@@ -320,9 +320,43 @@ class PlaybackCoordinator(
         }
     }
 
+    fun restItem(item: PlayableItem, durationMs: Long) {
+        val key = item.repeatKey
+        if (key.isBlank()) return
+        val now = Clock.System.now().toEpochMilliseconds()
+        val restUntil = now + durationMs
+        graph.player.repeatPolicy?.restItem(key, restUntil)
+        val history = playHistory ?: return
+        scope.launch {
+            try {
+                history.insertRepeatRest(key, now, restUntil)
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                throw c
+            } catch (e: Exception) {
+                log?.log(Logger.Level.WARN, "insertRepeatRest failed", e)
+            }
+        }
+    }
+
+    fun clearRepeatRest(key: String) {
+        if (key.isBlank()) return
+        graph.player.repeatPolicy?.clearRest(key)
+        val history = playHistory ?: return
+        scope.launch {
+            try {
+                history.clearRepeatRest(key)
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                throw c
+            } catch (e: Exception) {
+                log?.log(Logger.Level.WARN, "clearRepeatRest failed", e)
+            }
+        }
+    }
+
     private fun checkManualReplay(item: PlayableItem) {
         scope.launch {
             val key = repeatKeyForItem(item) ?: return@launch
+            clearRepeatRest(key)
             val now = Clock.System.now().toEpochMilliseconds()
             if (graph.player.repeatPolicy?.hasEventInWindow(key, RepeatConfig.HISTORY_WINDOW_MS, now) == true) {
                 recordRepeatEvent(key, RepeatConfig.WEIGHT_REPLAY_OR_SEARCH)

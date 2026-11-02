@@ -238,6 +238,9 @@ internal class PlayerImpl(
 
     override fun playAt(index: Int) {
         if (released) return
+        controller.state.items.getOrNull(index)?.let { target ->
+            repeatPolicy?.clearRest(target.repeatKey)
+        }
         if (controller.moveTo(index)) {
             publishQueue(refreshNext = false)
             setPlayWhenReadyIntent(true)

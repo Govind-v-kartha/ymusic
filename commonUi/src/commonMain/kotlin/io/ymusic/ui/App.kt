@@ -1572,6 +1572,19 @@ private fun DiscoverFeed(
                 } else {
                     null
                 },
+                topContent = if (tab == DiscoverTab.Home) {
+                    {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = DesignSpacing.MarginCompact, vertical = DesignSpacing.Space8),
+                        ) {
+                            NoRepeatChip(graph)
+                        }
+                    }
+                } else {
+                    null
+                },
                 onOpen = onOpen,
                 onPlayItem = if (tab == DiscoverTab.TopTracks) {
                     { tapped ->
