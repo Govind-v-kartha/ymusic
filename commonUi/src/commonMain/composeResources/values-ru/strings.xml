@@ -650,4 +650,16 @@
     <string name="a11y_key_arrow_up">стрелка вверх</string>
     <string name="a11y_key_arrow_down">стрелка вниз</string>
     <string name="cd_always_on_top">Поверх всех окон</string>
+
+    <string name="settings_no_repeat_hours">Окно без повторов</string>
+    <string name="settings_no_repeat_hours_helper">Повтор одного трека игнорирует это.</string>
+    <string name="settings_no_repeat_off">Выкл.</string>
+    <string name="settings_no_repeat_1h">1 час</string>
+    <string name="settings_no_repeat_2h">2 часа</string>
+    <string name="settings_no_repeat_3h">3 часа</string>
+    <string name="settings_no_repeat_4h">4 часа</string>
+    <string name="settings_no_repeat_6h">6 часов</string>
+    <string name="settings_no_repeat_12h">12 часов</string>
+    <string name="settings_no_repeat_24h">24 часа</string>
+    <string name="player_no_repeat_queue_exhausted">Ограничения повторов смягчены для продолжения воспроизведения.</string>
 </resources>

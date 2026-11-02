@@ -72,6 +72,7 @@ kotlin {
                 api(project(":mse"))
                 // MsePlayer.create owns a QuickJS dispatcher; not re-exported (shells never touch it).
                 implementation(project(":quickjs"))
+                implementation(Libs.Kotlinx.atomicfu)
             }
         }
 

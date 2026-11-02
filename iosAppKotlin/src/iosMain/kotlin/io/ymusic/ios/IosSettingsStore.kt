@@ -1,5 +1,6 @@
 package io.ymusic.ios
 
+import io.ymusic.settings.AppSettings
 import io.ymusic.settings.StringBackedSettingsStore
 import io.ymusic.ui.PlaybackAudioOnlyKey
 import io.ymusic.ui.PlaybackEqKey
@@ -47,6 +48,7 @@ internal class IosSettingsStore(
             PlaybackEqKey,
             PlaybackShuffleKey,
             PlaybackLoopModeKey,
+            AppSettings.noRepeatHours.key,
         )
     }
 }

@@ -159,6 +159,12 @@ object AppSettings {
     const val AUDIO_FOCUS_CALLS = "calls"
     const val AUDIO_FOCUS_APPS = "apps"
 
+    /**
+     * Window in hours for no-repeat / fatigue decay filtering (0 = Off).
+     * Options: 0, 1, 2, 3, 4, 6, 12, 24.
+     */
+    val noRepeatHours = IntSetting("playback.noRepeatHours", 0)
+
     /** The sleep-timer dialog's last chosen duration, its starting value next time. */
     val sleepTimerMinutes = IntSetting("playback.sleepTimerMinutes", 30)
 

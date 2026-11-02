@@ -634,4 +634,16 @@
     <string name="a11y_key_arrow_up">மேல் அம்பு</string>
     <string name="a11y_key_arrow_down">கீழ் அம்பு</string>
     <string name="cd_always_on_top">எப்போதும் மேலே</string>
+
+    <string name="settings_no_repeat_hours">No-repeat window</string>
+    <string name="settings_no_repeat_hours_helper">Repeat one ignores this.</string>
+    <string name="settings_no_repeat_off">Off</string>
+    <string name="settings_no_repeat_1h">1 hour</string>
+    <string name="settings_no_repeat_2h">2 hours</string>
+    <string name="settings_no_repeat_3h">3 hours</string>
+    <string name="settings_no_repeat_4h">4 hours</string>
+    <string name="settings_no_repeat_6h">6 hours</string>
+    <string name="settings_no_repeat_12h">12 hours</string>
+    <string name="settings_no_repeat_24h">24 hours</string>
+    <string name="player_no_repeat_queue_exhausted">Repeat limits relaxed to keep playing.</string>
 </resources>

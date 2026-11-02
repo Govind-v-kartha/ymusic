@@ -7,6 +7,12 @@ import io.ymusic.dynamicengine.DynamicEngineManager
 import io.ymusic.imageloader.ImageLoader
 import io.ymusic.mediastore.BetterMediaStore
 import io.ymusic.player.LoopMode
+import io.ymusic.player.repeat.RepeatConfig
+import io.ymusic.player.repeat.RepeatPolicyImpl
+import io.ymusic.ui.resources.Res
+import io.ymusic.ui.resources.player_no_repeat_queue_exhausted
+import kotlin.time.Clock
+import org.jetbrains.compose.resources.getString
 import io.ymusic.player.PlayableItem
 import io.ymusic.player.Player
 import io.ymusic.remoteconfig.ApiService
@@ -275,6 +281,32 @@ class AppGraph(
     }
 
     init {
+        val repeatPolicy = RepeatPolicyImpl()
+        player.repeatPolicy = repeatPolicy
+        player.configureRepeatPolicy(
+            noRepeatHours = { settings.flow(AppSettings.noRepeatHours).value },
+            onFallbackNotice = {
+                CoroutineScope(Dispatchers.Main.immediate).launch {
+                    GlobalShortcutActions.showMessage(getString(Res.string.player_no_repeat_queue_exhausted))
+                }
+            },
+        )
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            try {
+                val history = playHistory
+                if (history != null && !guest) {
+                    val sinceMs = Clock.System.now().toEpochMilliseconds() - RepeatConfig.HISTORY_WINDOW_MS
+                    history.pruneRepeatEvents(sinceMs)
+                    val snapshot = history.loadRecentRepeatEvents(sinceMs)
+                    repeatPolicy.initSnapshot(snapshot)
+                } else {
+                    repeatPolicy.initSnapshot(emptyMap())
+                }
+            } catch (e: Exception) {
+                logger?.fork("repeat-policy")?.log(kmpcommon.log.Logger.Level.WARN, "RepeatPolicy snapshot load failed (E60067)", e)
+            }
+        }
+
         // Process-lifetime like the graph itself: every queue is recorded, whatever screen is up.
         playHistory?.takeUnless { guest }?.let {
             PlayAgainRecorder(player, it.playAgain, logger?.fork("play-again")) { item ->

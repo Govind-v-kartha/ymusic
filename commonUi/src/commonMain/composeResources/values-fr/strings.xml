@@ -642,4 +642,16 @@
     <string name="a11y_key_arrow_up">flèche haut</string>
     <string name="a11y_key_arrow_down">flèche bas</string>
     <string name="cd_always_on_top">Toujours au premier plan</string>
+
+    <string name="settings_no_repeat_hours">Fenêtre de non-répétition</string>
+    <string name="settings_no_repeat_hours_helper">La répétition unique ignore cela.</string>
+    <string name="settings_no_repeat_off">Désactivé</string>
+    <string name="settings_no_repeat_1h">1 heure</string>
+    <string name="settings_no_repeat_2h">2 heures</string>
+    <string name="settings_no_repeat_3h">3 heures</string>
+    <string name="settings_no_repeat_4h">4 heures</string>
+    <string name="settings_no_repeat_6h">6 heures</string>
+    <string name="settings_no_repeat_12h">12 heures</string>
+    <string name="settings_no_repeat_24h">24 heures</string>
+    <string name="player_no_repeat_queue_exhausted">Limites de répétition assouplies pour continuer la lecture.</string>
 </resources>

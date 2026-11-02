@@ -626,4 +626,16 @@
     <string name="a11y_key_arrow_up">上矢印</string>
     <string name="a11y_key_arrow_down">下矢印</string>
     <string name="cd_always_on_top">常に手前に表示</string>
+
+    <string name="settings_no_repeat_hours">重複防止期間</string>
+    <string name="settings_no_repeat_hours_helper">1曲リピートでは無視されます。</string>
+    <string name="settings_no_repeat_off">オフ</string>
+    <string name="settings_no_repeat_1h">1時間</string>
+    <string name="settings_no_repeat_2h">2時間</string>
+    <string name="settings_no_repeat_3h">3時間</string>
+    <string name="settings_no_repeat_4h">4時間</string>
+    <string name="settings_no_repeat_6h">6時間</string>
+    <string name="settings_no_repeat_12h">12時間</string>
+    <string name="settings_no_repeat_24h">24時間</string>
+    <string name="player_no_repeat_queue_exhausted">再生を継続するため重複制限を緩和しました。</string>
 </resources>

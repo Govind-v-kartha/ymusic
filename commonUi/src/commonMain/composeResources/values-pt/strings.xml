@@ -642,4 +642,16 @@
     <string name="a11y_key_arrow_up">seta para cima</string>
     <string name="a11y_key_arrow_down">seta para baixo</string>
     <string name="cd_always_on_top">Sempre visível</string>
+
+    <string name="settings_no_repeat_hours">Janela sem repetição</string>
+    <string name="settings_no_repeat_hours_helper">A repetição de uma faixa ignora isto.</string>
+    <string name="settings_no_repeat_off">Desativado</string>
+    <string name="settings_no_repeat_1h">1 hora</string>
+    <string name="settings_no_repeat_2h">2 horas</string>
+    <string name="settings_no_repeat_3h">3 horas</string>
+    <string name="settings_no_repeat_4h">4 horas</string>
+    <string name="settings_no_repeat_6h">6 horas</string>
+    <string name="settings_no_repeat_12h">12 horas</string>
+    <string name="settings_no_repeat_24h">24 horas</string>
+    <string name="player_no_repeat_queue_exhausted">Limites de repetição flexibilizados para continuar tocando.</string>
 </resources>

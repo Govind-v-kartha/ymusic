@@ -1,6 +1,8 @@
 package io.ymusic.ui
 
 import io.ymusic.dynamicengine.yt.YtFeedItem
+import io.ymusic.player.repeat.RepeatConfig
+import kotlin.time.Clock
 import io.ymusic.dynamicengine.yt.YtThumb
 import io.ymusic.mediastore.model.MediaStoreItem
 import io.ymusic.player.PlayableItem
@@ -86,6 +88,26 @@ class PlaybackCoordinator(
             scope.launch {
                 var trackingItem: PlayableItem? = null
                 var trackedAt: TimeSource.Monotonic.ValueTimeMark? = null
+                var accumulatedPlayTimeMs = 0L
+                var playQualified = false
+                var playRewound = false
+                var lastProgressPositionMs = 0L
+
+                launch {
+                    player.progress.collect { prog ->
+                        val pos = prog.positionMs
+                        val diff = lastProgressPositionMs - pos
+                        if (diff > 5_000L && !playRewound) {
+                            val item = trackingItem
+                            if (item != null) {
+                                playRewound = true
+                                recordRepeatEvent(item, RepeatConfig.WEIGHT_REWIND)
+                            }
+                        }
+                        lastProgressPositionMs = pos
+                    }
+                }
+
                 suspend fun flush() {
                     val item = trackingItem
                     val mark = trackedAt
@@ -94,6 +116,11 @@ class PlaybackCoordinator(
                     if (item == null || mark == null) return
                     val watchTimeMs = mark.elapsedNow().inWholeMilliseconds
                     if (watchTimeMs <= 0L) return
+                    accumulatedPlayTimeMs += watchTimeMs
+                    if (!playQualified && shouldQualify(item, accumulatedPlayTimeMs)) {
+                        playQualified = true
+                        recordRepeatEvent(item, RepeatConfig.WEIGHT_QUALIFYING)
+                    }
                     try {
                         addWatchTime(item, watchTimeMs)
                     } catch (c: kotlinx.coroutines.CancellationException) {
@@ -118,6 +145,19 @@ class PlaybackCoordinator(
                                 flush()
                                 trackingItem = item
                                 trackedAt = TimeSource.Monotonic.markNow()
+                                accumulatedPlayTimeMs = 0L
+                                playQualified = false
+                                playRewound = false
+                                lastProgressPositionMs = 0L
+                            } else {
+                                val currentMark = trackedAt
+                                if (currentMark != null) {
+                                    val totalListened = accumulatedPlayTimeMs + currentMark.elapsedNow().inWholeMilliseconds
+                                    if (!playQualified && shouldQualify(item, totalListened)) {
+                                        playQualified = true
+                                        recordRepeatEvent(item, RepeatConfig.WEIGHT_QUALIFYING)
+                                    }
+                                }
                             }
                         }
                 } finally {
@@ -146,6 +186,7 @@ class PlaybackCoordinator(
     /** Play [video] now with its radio (a YouTube Mix) as the rest of the queue, loading as it plays;
      *  its related videos when YouTube has no radio for it. */
     fun playNow(video: YtFeedItem) {
+        checkManualReplay(video.toYtMedia())
         player.setQueue(
             listOf(video.toYtMedia()),
             source = NextQueueSource.radio(graph.engines, video.id, log?.fork("queue-source")),
@@ -154,6 +195,7 @@ class PlaybackCoordinator(
 
     /** Play [video] alone — no radio. */
     fun playSingle(video: YtFeedItem) {
+        checkManualReplay(video.toYtMedia())
         player.setQueue(listOf(video.toYtMedia()))
     }
 
@@ -162,6 +204,7 @@ class PlaybackCoordinator(
     fun playAll(videos: List<YtFeedItem>, startIndex: Int = 0, shuffle: Boolean? = null, source: QueueSource? = null) {
         val playable = videos.filter { it.kind == YtFeedItem.KIND_VIDEO }
         if (playable.isEmpty()) return
+        videos.getOrNull(startIndex)?.let { checkManualReplay(it.toYtMedia()) }
         shuffle?.let(player::setShuffle)
         player.setQueue(
             playable.map { it.toYtMedia() },
@@ -172,12 +215,14 @@ class PlaybackCoordinator(
 
     /** Play local library [songs] as the queue, starting at [index]. [shuffle] null keeps the user's shuffle mode. */
     fun playLocal(songs: List<MediaStoreItem>, index: Int, shuffle: Boolean? = null) {
+        songs.getOrNull(index)?.let { checkManualReplay(it.toLocalMedia()) }
         shuffle?.let(player::setShuffle)
         player.setQueue(songs.map { it.toLocalMedia() }, playIndex = index)
     }
 
     /** Play just [song] now (queue of one). */
     fun playLocalSingle(song: MediaStoreItem) {
+        checkManualReplay(song.toLocalMedia())
         player.setQueue(listOf(song.toLocalMedia()))
     }
 
@@ -227,6 +272,62 @@ class PlaybackCoordinator(
 
     fun playLater(video: YtFeedItem) {
         player.add(listOf(video.toYtMedia()))
+    }
+
+    private fun shouldQualify(item: PlayableItem, listenedMs: Long): Boolean {
+        if (item is PlayableItem.YtMedia && item.live) return false
+        val durationMs = item.durationMs
+        val thresholdMs = if (durationMs != null && durationMs > 0L) {
+            minOf(30_000L, durationMs / 2)
+        } else {
+            30_000L
+        }
+        return listenedMs >= thresholdMs
+    }
+
+    private suspend fun repeatKeyForItem(item: PlayableItem): String? = when (item) {
+        is PlayableItem.YtMedia -> item.videoId
+        is PlayableItem.LocalMedia -> {
+            // TODO: iOS local files stay unfiltered (mediaStore = null today)
+            val id = item.mediaId
+            if (id != null) {
+                mediaStore?.findItem(id)?.playlistCode ?: item.playlistCode ?: item.uri
+            } else {
+                item.playlistCode ?: item.uri
+            }
+        }
+    }
+
+    private fun recordRepeatEvent(item: PlayableItem, weight: Double) {
+        scope.launch {
+            val key = repeatKeyForItem(item) ?: return@launch
+            recordRepeatEvent(key, weight)
+        }
+    }
+
+    private fun recordRepeatEvent(key: String, weight: Double) {
+        val now = Clock.System.now().toEpochMilliseconds()
+        graph.player.repeatPolicy?.recordEvent(key, now, weight)
+        val history = playHistory ?: return
+        scope.launch {
+            try {
+                history.insertRepeatEvent(key, now, weight)
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                throw c
+            } catch (e: Exception) {
+                log?.log(Logger.Level.WARN, "insertRepeatEvent failed", e)
+            }
+        }
+    }
+
+    private fun checkManualReplay(item: PlayableItem) {
+        scope.launch {
+            val key = repeatKeyForItem(item) ?: return@launch
+            val now = Clock.System.now().toEpochMilliseconds()
+            if (graph.player.repeatPolicy?.hasEventInWindow(key, RepeatConfig.HISTORY_WINDOW_MS, now) == true) {
+                recordRepeatEvent(key, RepeatConfig.WEIGHT_REPLAY_OR_SEARCH)
+            }
+        }
     }
 
     private suspend fun addWatchTime(item: PlayableItem, watchTimeMs: Long) {
@@ -306,6 +407,7 @@ fun MediaStoreItem.toLocalMedia() = PlayableItem.LocalMedia(
     album = album,
     thumbnailUrl = localArtUrl(this),
     durationMs = durationMs,
+    playlistCode = playlistCode,
 )
 
 /** A scraped video as a self-describing queue item — keeps just what the UI + downloads need. */

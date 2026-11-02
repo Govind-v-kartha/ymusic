@@ -1,6 +1,8 @@
 package io.ymusic.player
 
+import io.ymusic.player.repeat.RepeatPolicy
 import kotlin.random.Random
+import kotlin.time.Clock
 
 enum class LoopMode {
     /** Stop at the end of the queue. */
@@ -67,7 +69,13 @@ data class QueueMore(
  * walks back through what actually played, and index remapping keeps that history valid across
  * add/move/remove.
  */
-internal class QueueController(private val random: Random = Random.Default) {
+internal class QueueController(
+    private val random: Random = Random.Default,
+    var repeatPolicy: RepeatPolicy? = null,
+    var noRepeatHours: () -> Int = { 0 },
+    var isRadioOrAutoplay: () -> Boolean = { false },
+    var onFallbackNotice: (() -> Unit)? = null,
+) {
     var state: QueueState = QueueState()
         private set
 
@@ -119,14 +127,53 @@ internal class QueueController(private val random: Random = Random.Default) {
         if (items.isEmpty()) return null
         if (!userInitiated && state.loopMode == LoopMode.One) return state.currentIndex
         upNext.firstOrNull()?.let { return it }
-        return if (state.shuffle) peekShuffled() else nextLinear()
+        val policy = repeatPolicy
+        if (policy == null || !policy.isReady) {
+            return if (state.shuffle) peekShuffled() else nextLinear()
+        }
+        val candidates: List<Int> = if (state.shuffle) {
+            val unplayed = items.indices - played.toSet()
+            if (unplayed.isNotEmpty()) unplayed.toList()
+            else if (items.size > 1) (items.indices - state.currentIndex).toList()
+            else items.indices.toList()
+        } else {
+            val nextList = mutableListOf<Int>()
+            for (i in (state.currentIndex + 1) until items.size) {
+                nextList.add(i)
+            }
+            if (state.loopMode == LoopMode.All) {
+                for (i in 0 until state.currentIndex) {
+                    nextList.add(i)
+                }
+            }
+            nextList
+        }
+        if (candidates.isEmpty()) return null
+
+        val allowScoreReordering = state.shuffle || isRadioOrAutoplay()
+        val now = Clock.System.now().toEpochMilliseconds()
+        return policy.selectNextIndex(
+            candidates = candidates,
+            items = items,
+            currentIndex = state.currentIndex,
+            noRepeatHours = noRepeatHours(),
+            allowScoreReordering = allowScoreReordering,
+            isExempt = { false },
+            now = now,
+            onFallbackNotice = onFallbackNotice,
+        )
     }
 
     /** Make [index] (from [peekNext]) the current item, updating shuffle history. */
     fun commitNext(index: Int) {
         val unplayed = state.items.indices - played.toSet()
         if (state.shuffle && unplayed.isEmpty()) played.clear()
+        val isExplicitUpNext = upNext.firstOrNull() == index
+        val itemKey = state.items.getOrNull(index)?.repeatKey
         advanceTo(index)
+        if (!isExplicitUpNext && itemKey != null) {
+            repeatPolicy?.recordAutoPlay(itemKey)
+        }
     }
 
     /**

@@ -642,4 +642,16 @@
     <string name="a11y_key_arrow_up">freccia su</string>
     <string name="a11y_key_arrow_down">freccia giù</string>
     <string name="cd_always_on_top">Sempre in primo piano</string>
+
+    <string name="settings_no_repeat_hours">Finestra senza ripetizioni</string>
+    <string name="settings_no_repeat_hours_helper">La ripetizione singola ignora questa impostazione.</string>
+    <string name="settings_no_repeat_off">Disattivato</string>
+    <string name="settings_no_repeat_1h">1 ora</string>
+    <string name="settings_no_repeat_2h">2 ore</string>
+    <string name="settings_no_repeat_3h">3 ore</string>
+    <string name="settings_no_repeat_4h">4 ore</string>
+    <string name="settings_no_repeat_6h">6 ore</string>
+    <string name="settings_no_repeat_12h">12 ore</string>
+    <string name="settings_no_repeat_24h">24 ore</string>
+    <string name="player_no_repeat_queue_exhausted">Limites di ripetizione allentati per continuare la riproduzione.</string>
 </resources>

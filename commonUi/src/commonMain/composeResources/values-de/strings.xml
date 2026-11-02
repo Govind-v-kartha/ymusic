@@ -634,4 +634,16 @@
     <string name="a11y_key_arrow_up">Pfeil nach oben</string>
     <string name="a11y_key_arrow_down">Pfeil nach unten</string>
     <string name="cd_always_on_top">Immer im Vordergrund</string>
+
+    <string name="settings_no_repeat_hours">Wiederholungsfreies Fenster</string>
+    <string name="settings_no_repeat_hours_helper">Einzeltitelwiederholung ignoriert dies.</string>
+    <string name="settings_no_repeat_off">Aus</string>
+    <string name="settings_no_repeat_1h">1 Stunde</string>
+    <string name="settings_no_repeat_2h">2 Stunden</string>
+    <string name="settings_no_repeat_3h">3 Stunden</string>
+    <string name="settings_no_repeat_4h">4 Stunden</string>
+    <string name="settings_no_repeat_6h">6 Stunden</string>
+    <string name="settings_no_repeat_12h">12 Stunden</string>
+    <string name="settings_no_repeat_24h">24 Stunden</string>
+    <string name="player_no_repeat_queue_exhausted">Wiederholungslimits gelockert, um weiterzuspielen.</string>
 </resources>

@@ -634,4 +634,16 @@
     <string name="a11y_key_arrow_up">ऊपर तीर</string>
     <string name="a11y_key_arrow_down">नीचे तीर</string>
     <string name="cd_always_on_top">हमेशा सबसे ऊपर</string>
+
+    <string name="settings_no_repeat_hours">दोहराव-मुक्त समय</string>
+    <string name="settings_no_repeat_hours_helper">एक गाना दोहराने पर यह लागू नहीं होता।</string>
+    <string name="settings_no_repeat_off">बंद</string>
+    <string name="settings_no_repeat_1h">1 घंटा</string>
+    <string name="settings_no_repeat_2h">2 घंटे</string>
+    <string name="settings_no_repeat_3h">3 घंटे</string>
+    <string name="settings_no_repeat_4h">4 घंटे</string>
+    <string name="settings_no_repeat_6h">6 घंटे</string>
+    <string name="settings_no_repeat_12h">12 घंटे</string>
+    <string name="settings_no_repeat_24h">24 घंटे</string>
+    <string name="player_no_repeat_queue_exhausted">बजाना जारी रखने के लिए दोहराव सीमा शिथिल की गई।</string>
 </resources>

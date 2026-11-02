@@ -1,5 +1,6 @@
 package io.ymusic.player
 
+import io.ymusic.player.repeat.RepeatPolicy
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharedFlow
@@ -205,6 +206,15 @@ interface Player {
 
     /** Releases both engines and stops all internal work. The instance is unusable afterwards. */
     fun release()
+
+    var repeatPolicy: RepeatPolicy?
+        get() = null
+        set(_) {}
+
+    fun configureRepeatPolicy(
+        noRepeatHours: () -> Int,
+        onFallbackNotice: (() -> Unit)? = null,
+    ) {}
 }
 
 /**
@@ -221,7 +231,8 @@ fun createPlayer(
     engines: PlayerEngines,
     mainDispatcher: CoroutineDispatcher = Dispatchers.Main,
     random: Random = Random.Default,
-): Player = PlayerImpl(engines, mainDispatcher, random)
+    repeatPolicy: RepeatPolicy? = null,
+): Player = PlayerImpl(engines, mainDispatcher, random, repeatPolicy)
 
 /**
  * One watch-next payload the playing page reported: [contentsJson] is YouTube's related-items array

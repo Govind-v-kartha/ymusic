@@ -21,6 +21,18 @@ sealed interface PlayableItem {
      *  durations for every queue row, not just the loaded one. */
     val durationMs: Long?
 
+    val repeatKey: String
+        get() = when (this) {
+            is YtMedia -> videoId
+            is LocalMedia -> playlistCode ?: mediaId?.toString() ?: uri
+        }
+
+    val artistName: String?
+        get() = when (this) {
+            is YtMedia -> artist
+            is LocalMedia -> artist
+        }
+
     /**
      * A local file. [uri] (a `file://` URI or an absolute path) is all the native-local engine needs;
      * the rest travels with the item so the UI (Now Playing display, play-count recording) never has
@@ -35,6 +47,7 @@ sealed interface PlayableItem {
         val album: String? = null,
         val thumbnailUrl: String? = null,
         override val durationMs: Long? = null,
+        val playlistCode: String? = null,
     ) : PlayableItem {
         override val displayTitle: String get() = title ?: uri.substringAfterLast('/')
         override val displaySubtitle: String? get() = listOfNotNull(artist, album).joinToString(" · ").ifEmpty { null }
@@ -55,6 +68,7 @@ sealed interface PlayableItem {
         val thumbnailUrl: String? = null,
         val duration: String? = null,
         override val durationMs: Long? = null,
+        val playlistCode: String? = null,
         val live: Boolean = false,
         /** The engine-composed app link to the owner channel's page, when the source knew it. */
         val channelUrl: String? = null,

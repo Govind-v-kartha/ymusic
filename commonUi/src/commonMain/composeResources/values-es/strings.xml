@@ -642,4 +642,16 @@
     <string name="a11y_key_arrow_up">flecha arriba</string>
     <string name="a11y_key_arrow_down">flecha abajo</string>
     <string name="cd_always_on_top">Siempre visible</string>
+
+    <string name="settings_no_repeat_hours">Ventana sin repetición</string>
+    <string name="settings_no_repeat_hours_helper">La repetición individual ignora esto.</string>
+    <string name="settings_no_repeat_off">Desactivado</string>
+    <string name="settings_no_repeat_1h">1 hora</string>
+    <string name="settings_no_repeat_2h">2 horas</string>
+    <string name="settings_no_repeat_3h">3 horas</string>
+    <string name="settings_no_repeat_4h">4 horas</string>
+    <string name="settings_no_repeat_6h">6 horas</string>
+    <string name="settings_no_repeat_12h">12 horas</string>
+    <string name="settings_no_repeat_24h">24 horas</string>
+    <string name="player_no_repeat_queue_exhausted">Límites de repetición relajados para seguir reproduciendo.</string>
 </resources>

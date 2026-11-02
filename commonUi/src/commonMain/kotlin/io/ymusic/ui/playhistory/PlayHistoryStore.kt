@@ -3,6 +3,7 @@ package io.ymusic.ui.playhistory
 import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlDriver
 import io.ymusic.dynamicengine.yt.YtFeedItem
+import io.ymusic.player.repeat.RepeatEvent
 import io.ymusic.dynamicengine.yt.YtThumb
 import io.ymusic.mediastore.model.MediaStoreItem
 import io.ymusic.ui.youtubeThumbUrl
@@ -269,6 +270,49 @@ class PlayHistoryStore(
             """.trimIndent(),
             1,
         ) { bindLong(0, keep.toLong()) }
+    }
+
+    suspend fun insertRepeatEvent(itemKey: String, playedAt: Long, weight: Double) {
+        withContext(io) {
+            driver.execute(
+                null,
+                "INSERT INTO repeat_events (item_key, played_at, weight) VALUES (?, ?, ?)",
+                3,
+            ) {
+                bindString(0, itemKey)
+                bindLong(1, playedAt)
+                bindDouble(2, weight)
+            }
+        }
+    }
+
+    suspend fun loadRecentRepeatEvents(sinceMs: Long): Map<String, List<RepeatEvent>> =
+        withContext(io) {
+            driver.executeQuery(
+                null,
+                "SELECT item_key, played_at, weight FROM repeat_events WHERE played_at >= ? ORDER BY played_at ASC",
+                { cursor ->
+                    val map = mutableMapOf<String, MutableList<RepeatEvent>>()
+                    while (cursor.next().value) {
+                        val key = cursor.getString(0)!!
+                        val playedAt = cursor.getLong(1)!!
+                        val weight = cursor.getDouble(2)!!
+                        map.getOrPut(key) { mutableListOf() }.add(RepeatEvent(playedAt, weight))
+                    }
+                    QueryResult.Value(map)
+                },
+                1,
+            ) { bindLong(0, sinceMs) }.value
+        }
+
+    suspend fun pruneRepeatEvents(olderThanMs: Long) {
+        withContext(io) {
+            driver.execute(
+                null,
+                "DELETE FROM repeat_events WHERE played_at < ?",
+                1,
+            ) { bindLong(0, olderThanMs) }
+        }
     }
 
     companion object {

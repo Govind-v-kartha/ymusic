@@ -626,4 +626,16 @@
     <string name="a11y_key_arrow_up">上方向鍵</string>
     <string name="a11y_key_arrow_down">下方向鍵</string>
     <string name="cd_always_on_top">永遠在最上層</string>
+
+    <string name="settings_no_repeat_hours">防重複時間窗口</string>
+    <string name="settings_no_repeat_hours_helper">單曲循環忽略此設定。</string>
+    <string name="settings_no_repeat_off">關閉</string>
+    <string name="settings_no_repeat_1h">1 小時</string>
+    <string name="settings_no_repeat_2h">2 小時</string>
+    <string name="settings_no_repeat_3h">3 小時</string>
+    <string name="settings_no_repeat_4h">4 小時</string>
+    <string name="settings_no_repeat_6h">6 小時</string>
+    <string name="settings_no_repeat_12h">12 小時</string>
+    <string name="settings_no_repeat_24h">24 小時</string>
+    <string name="player_no_repeat_queue_exhausted">已放寬重複限制以繼續播放。</string>
 </resources>

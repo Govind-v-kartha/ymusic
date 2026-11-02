@@ -181,6 +181,7 @@ fun SettingsScreen(graph: AppGraph, signedIn: Boolean = false, onLogin: () -> Un
             SoundRow(graph, speed = false)
             ToggleRow(graph, AppSettings.enablePip, Res.string.settings_enable_pip, Res.string.settings_enable_pip_hint)
             if (graph.audioFocusSetting) AudioFocusRow(graph)
+            NoRepeatRow(graph)
             ToggleRow(
                 graph,
                 AppSettings.sponsorBlockEnabled,
@@ -323,6 +324,58 @@ private fun AudioFocusRow(graph: AppGraph) {
 }
 
 @Composable
+private val NoRepeatOptions: List<Pair<Int, StringResource>> = listOf(
+    0 to Res.string.settings_no_repeat_off,
+    1 to Res.string.settings_no_repeat_1h,
+    2 to Res.string.settings_no_repeat_2h,
+    3 to Res.string.settings_no_repeat_3h,
+    4 to Res.string.settings_no_repeat_4h,
+    6 to Res.string.settings_no_repeat_6h,
+    12 to Res.string.settings_no_repeat_12h,
+    24 to Res.string.settings_no_repeat_24h,
+)
+
+@Composable
+private fun NoRepeatRow(graph: AppGraph) {
+    val scope = rememberCoroutineScope()
+    val current by remember(graph) { graph.settings.flow(AppSettings.noRepeatHours) }.collectAsState()
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clickable { open = true }
+                .padding(horizontal = DesignSpacing.SettingsRowHorizontal, vertical = DesignSpacing.SettingsRowVertical),
+        ) {
+            Text(
+                stringResource(Res.string.settings_no_repeat_hours),
+                style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = DesignColors.Ink),
+            )
+            Text(
+                stringResource((NoRepeatOptions.firstOrNull { it.first == current } ?: NoRepeatOptions.first()).second),
+                style = TextStyle(fontSize = 12.sp, color = DesignColors.InkSecondary),
+                modifier = Modifier.padding(top = DesignSpacing.Space2),
+            )
+            Text(
+                stringResource(Res.string.settings_no_repeat_hours_helper),
+                style = TextStyle(fontSize = 11.sp, color = DesignColors.InkSecondary),
+                modifier = Modifier.padding(top = DesignSpacing.Space1),
+            )
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            NoRepeatOptions.forEach { (value, label) ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(label)) },
+                    onClick = {
+                        open = false
+                        scope.launch { graph.settings.put(AppSettings.noRepeatHours, value) }
+                    },
+                )
+            }
+        }
+    }
+}
+
 private fun LinkRow(label: StringResource, url: String) {
     val uriHandler = LocalUriHandler.current
     Text(

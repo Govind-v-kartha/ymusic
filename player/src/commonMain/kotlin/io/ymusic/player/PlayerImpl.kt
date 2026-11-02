@@ -1,5 +1,6 @@
 package io.ymusic.player
 
+import io.ymusic.player.repeat.RepeatPolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -24,9 +25,26 @@ internal class PlayerImpl(
     private val engines: PlayerEngines,
     mainDispatcher: CoroutineDispatcher,
     private val random: Random,
+    repeatPolicy: RepeatPolicy? = null,
 ) : Player {
     private val scope = CoroutineScope(SupervisorJob() + mainDispatcher)
-    private val controller = QueueController(random)
+    private val controller = QueueController(random, repeatPolicy)
+
+    override var repeatPolicy: RepeatPolicy?
+        get() = controller.repeatPolicy
+        set(value) {
+            controller.repeatPolicy = value
+            refreshPrepareNext()
+        }
+
+    override fun configureRepeatPolicy(
+        noRepeatHours: () -> Int,
+        onFallbackNotice: (() -> Unit)?,
+    ) {
+        controller.noRepeatHours = noRepeatHours
+        controller.isRadioOrAutoplay = { source != null }
+        controller.onFallbackNotice = onFallbackNotice
+    }
 
     private var localEngine: LocalPlayer? = null
     private var ytEngine: YtEngine? = null
