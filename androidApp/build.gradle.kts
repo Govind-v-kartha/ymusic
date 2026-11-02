@@ -60,9 +60,6 @@ android {
         targetSdk = Versions.targetSdk
         versionCode = appVersionCode
         versionName = appVersionName
-        ndk {
-            abiFilters.addAll(appAbis)
-        }
         buildConfigField("String", "SENTRY_DSN", "\"${sentryDsn()}\"")
         buildConfigField("String", "GIT_COMMIT", "\"${gitCommit()}\"")
         // Base url of the remote config service. Empty = no request, compiled-in defaults.
