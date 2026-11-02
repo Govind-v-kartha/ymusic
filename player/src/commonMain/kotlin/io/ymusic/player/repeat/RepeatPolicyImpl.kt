@@ -17,19 +17,39 @@ class RepeatPolicyImpl(
     private val snapshot = mutableMapOf<String, MutableList<RepeatEvent>>()
     private val restedUntil = mutableMapOf<String, Long>()
     private val recentAutoPlays = ArrayDeque<String>(RepeatConfig.RECENT_BUFFER_CAPACITY)
+    private var pendingClear: Boolean = false
+
+    override val hasHistory: Boolean
+        get() = synchronized(lock) {
+            snapshot.isNotEmpty() || restedUntil.isNotEmpty() || recentAutoPlays.isNotEmpty()
+        }
 
     override fun initSnapshot(snapshot: Map<String, List<RepeatEvent>>) {
         synchronized(lock) {
             this.snapshot.clear()
             this.restedUntil.clear()
-            snapshot.forEach { (key, events) ->
-                this.snapshot[key] = events.toMutableList()
-                val activeRest = events.mapNotNull { it.restUntil }.maxOrNull()
-                if (activeRest != null) {
-                    this.restedUntil[key] = activeRest
+            if (!pendingClear) {
+                snapshot.forEach { (key, events) ->
+                    this.snapshot[key] = events.toMutableList()
+                    val activeRest = events.mapNotNull { it.restUntil }.maxOrNull()
+                    if (activeRest != null) {
+                        this.restedUntil[key] = activeRest
+                    }
                 }
             }
+            pendingClear = false
             isReady = true
+        }
+    }
+
+    override fun clearAll() {
+        synchronized(lock) {
+            snapshot.clear()
+            restedUntil.clear()
+            recentAutoPlays.clear()
+            if (!isReady) {
+                pendingClear = true
+            }
         }
     }
 

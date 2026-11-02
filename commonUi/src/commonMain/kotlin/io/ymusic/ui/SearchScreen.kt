@@ -76,7 +76,7 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
-private const val SearchHistoryKey = "search.history"
+internal const val SearchHistoryKey = "search.history"
 private const val HistoryLimit = 20
 
 /**

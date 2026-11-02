@@ -460,4 +460,128 @@ class RepeatPolicyTest {
         // Rested item has weight 0.0 and was not played; hasEventInWindow must be false
         assertFalse(policy.hasEventInWindow("vid_0", 3600_000L, now))
     }
+    @Test
+    fun clearAll_clears_rests_and_fatigue_and_resets_eligibility() {
+        val policy = RepeatPolicyImpl(Random(42))
+        val now = 10_000_000L
+        policy.initSnapshot(
+            mapOf("vid_0" to listOf(RepeatEvent(playedAt = now, weight = 1.0))),
+        )
+        policy.restItem("vid_1", now + 3600_000L)
+
+        assertTrue(policy.hasHistory)
+        assertTrue(policy.isRested("vid_1", now))
+        assertEquals(1.0, policy.calculateFatigue("vid_0", now, 3))
+
+        policy.clearAll()
+
+        assertFalse(policy.hasHistory)
+        assertFalse(policy.isRested("vid_1", now))
+        assertEquals(0.0, policy.calculateFatigue("vid_0", now, 3))
+
+        val items = listOf(ytItem("vid_0"), ytItem("vid_1"))
+        val selected = policy.selectNextIndex(
+            candidates = listOf(0, 1),
+            items = items,
+            currentIndex = 1,
+            noRepeatHours = 3,
+            allowScoreReordering = false,
+            now = now,
+        )
+        assertEquals(0, selected)
+    }
+
+    @Test
+    fun clearAll_clears_recent_autoplay_ring_buffer() {
+        val policy = RepeatPolicyImpl(Random(42))
+        policy.initSnapshot(emptyMap())
+
+        policy.recordAutoPlay("vid_0")
+        assertTrue(policy.hasHistory)
+
+        val items = listOf(ytItem("vid_0"), ytItem("vid_1"))
+        // Before clear: vid_0 is in recentAutoPlays (gap check blocks it)
+        val selectedBefore = policy.selectNextIndex(
+            candidates = listOf(0, 1),
+            items = items,
+            currentIndex = 1,
+            noRepeatHours = 0,
+            allowScoreReordering = false,
+            now = 10_000_000L,
+        )
+        assertEquals(1, selectedBefore)
+
+        policy.clearAll()
+        assertFalse(policy.hasHistory)
+
+        // After clear: vid_0 gap is cleared; first candidate wins
+        val selectedAfter = policy.selectNextIndex(
+            candidates = listOf(0, 1),
+            items = items,
+            currentIndex = 1,
+            noRepeatHours = 0,
+            allowScoreReordering = false,
+            now = 10_000_000L,
+        )
+        assertEquals(0, selectedAfter)
+    }
+
+    @Test
+    fun clearAll_is_idempotent() {
+        val policy = RepeatPolicyImpl(Random(42))
+        policy.initSnapshot(emptyMap())
+        policy.restItem("vid_0", 10_000_000L)
+
+        policy.clearAll()
+        assertFalse(policy.hasHistory)
+
+        policy.clearAll()
+        assertFalse(policy.hasHistory)
+    }
+
+    @Test
+    fun late_snapshot_load_cannot_resurrect_cleared_events() {
+        val policy = RepeatPolicyImpl(Random(42))
+        assertFalse(policy.isReady)
+
+        // User clears heard history before background startup snapshot finishes loading
+        policy.clearAll()
+
+        // Background loader finishes late with old snapshot data
+        val now = 10_000_000L
+        val oldSnapshot = mapOf(
+            "vid_resurrect" to listOf(RepeatEvent(playedAt = now, weight = 1.0)),
+        )
+        policy.initSnapshot(oldSnapshot)
+
+        assertTrue(policy.isReady)
+        assertFalse(policy.hasHistory)
+        assertFalse(policy.hasEventInWindow("vid_resurrect", 3600_000L, now))
+    }
+
+    @Test
+    fun failed_db_delete_keeps_memory_unchanged() {
+        val policy = RepeatPolicyImpl(Random(42))
+        val now = 10_000_000L
+        policy.initSnapshot(
+            mapOf("vid_0" to listOf(RepeatEvent(playedAt = now, weight = 1.0))),
+        )
+        policy.restItem("vid_1", now + 3600_000L)
+
+        // Simulate failing DB transaction
+        var dbFailed = false
+        try {
+            throw RuntimeException("Simulated SQLite disk I/O error")
+            @Suppress("UNREACHABLE_CODE")
+            policy.clearAll()
+        } catch (_: RuntimeException) {
+            dbFailed = true
+        }
+
+        assertTrue(dbFailed)
+        // Memory state must remain completely intact
+        assertTrue(policy.hasHistory)
+        assertTrue(policy.isRested("vid_1", now))
+        assertEquals(1.0, policy.calculateFatigue("vid_0", now, 3))
+    }
 }

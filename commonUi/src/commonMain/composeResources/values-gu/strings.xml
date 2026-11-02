@@ -650,4 +650,14 @@
     <string name="menu_rest_song">Rest this song</string>
     <string name="no_repeat_chip">No repeat: %1$s</string>
     <string name="toast_resting_song">Resting this song for %1$s</string>
+    <string name="settings_clear_heard_history">Clear heard history</string>
+    <string name="settings_clear_heard_history_hint">Reset no-repeat and rested songs</string>
+    <string name="settings_clear_heard_history_dialog_message">Reset no-repeat tracking and all rested songs so they can play again immediately. Your library, playlists, favorites, and top tracks stay untouched.</string>
+    <string name="settings_clear_search_history">Clear search history</string>
+    <string name="settings_clear_search_history_hint">Remove recent search queries</string>
+    <string name="settings_clear_search_history_dialog_message">Remove all recent search queries. Playback history and library data stay untouched.</string>
+    <string name="settings_history_nothing_to_clear">Nothing to clear</string>
+    <string name="dialog_clear">Clear</string>
+    <string name="toast_heard_history_cleared">Heard history cleared</string>
+    <string name="toast_search_history_cleared">Search history cleared</string>
 </resources>

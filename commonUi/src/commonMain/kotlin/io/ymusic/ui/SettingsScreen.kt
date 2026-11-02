@@ -47,7 +47,20 @@ import io.ymusic.settings.BoolSetting
 import io.ymusic.settings.flow
 import io.ymusic.settings.put
 import io.ymusic.ui.resources.Res
+import androidx.compose.material3.TextButton
 import io.ymusic.ui.resources.dialog_cancel
+import io.ymusic.ui.resources.dialog_clear
+import io.ymusic.ui.resources.error_generic
+import io.ymusic.ui.resources.settings_clear_heard_history
+import io.ymusic.ui.resources.settings_clear_heard_history_dialog_message
+import io.ymusic.ui.resources.settings_clear_heard_history_hint
+import io.ymusic.ui.resources.settings_clear_search_history
+import io.ymusic.ui.resources.settings_clear_search_history_dialog_message
+import io.ymusic.ui.resources.settings_clear_search_history_hint
+import io.ymusic.ui.resources.settings_history_nothing_to_clear
+import io.ymusic.ui.resources.toast_heard_history_cleared
+import io.ymusic.ui.resources.toast_search_history_cleared
+import org.jetbrains.compose.resources.getString
 import io.ymusic.ui.resources.settings_audio_focus
 import io.ymusic.ui.resources.settings_audio_focus_apps
 import io.ymusic.ui.resources.settings_audio_focus_calls
@@ -205,6 +218,8 @@ fun SettingsScreen(graph: AppGraph, signedIn: Boolean = false, onLogin: () -> Un
         SettingsSection(Res.string.settings_section_privacy) {
             ToggleRow(graph, AppSettings.crashReports, Res.string.settings_crash_reports, Res.string.settings_crash_reports_hint)
             ToggleRow(graph, AppSettings.stats, Res.string.settings_stats, Res.string.settings_stats_hint)
+            ClearHeardHistoryRow(graph)
+            ClearSearchHistoryRow(graph)
         }
         SettingsSection(Res.string.settings_section_about) {
             VersionsRow(graph)
@@ -624,5 +639,182 @@ private fun LanguageRow(current: String, onSelect: (String) -> Unit) {
             onSelect = { tag -> onSelect(tag); open = false },
             onDismiss = { open = false },
         )
+    }
+}
+
+
+@Composable
+private fun ClearHeardHistoryRow(graph: AppGraph) {
+    val scope = rememberCoroutineScope()
+    var hasHeard by remember { mutableStateOf(graph.player.repeatPolicy?.hasHistory == true) }
+    var confirmOpen by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+
+    LaunchedEffect(graph) {
+        val history = graph.playHistory
+        if (history != null) {
+            hasHeard = history.hasRepeatEvents() || graph.player.repeatPolicy?.hasHistory == true
+        }
+    }
+
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(enabled = hasHeard) { confirmOpen = true }
+            .padding(horizontal = DesignSpacing.SettingsRowHorizontal, vertical = DesignSpacing.SettingsRowVertical),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                stringResource(Res.string.settings_clear_heard_history),
+                style = TextStyle(
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (hasHeard) DesignColors.Ink else DesignColors.InkSecondary,
+                ),
+            )
+            Text(
+                stringResource(
+                    if (hasHeard) Res.string.settings_clear_heard_history_hint
+                    else Res.string.settings_history_nothing_to_clear,
+                ),
+                style = TextStyle(fontSize = 12.sp, color = DesignColors.InkSecondary),
+                modifier = Modifier.padding(top = DesignSpacing.Space2),
+            )
+        }
+    }
+
+    if (confirmOpen) {
+        ElevatedBarDialog(
+            title = stringResource(Res.string.settings_clear_heard_history),
+            onDismiss = { if (!busy) confirmOpen = false },
+            canScrollBackward = false,
+            canScrollForward = false,
+            buttons = {
+                DialogSecondaryButton(
+                    stringResource(Res.string.dialog_cancel),
+                    enabled = !busy,
+                    onClick = { confirmOpen = false },
+                )
+                TextButton(
+                    enabled = !busy,
+                    onClick = {
+                        busy = true
+                        scope.launch {
+                            try {
+                                graph.clearHeardHistory()
+                                hasHeard = false
+                                confirmOpen = false
+                                GlobalShortcutActions.showMessage(getString(Res.string.toast_heard_history_cleared))
+                            } catch (c: kotlinx.coroutines.CancellationException) {
+                                throw c
+                            } catch (e: Exception) {
+                                graph.logger?.fork("settings")?.log(Logger.Level.WARN, "clearHeardHistory failed", e)
+                                confirmOpen = false
+                                GlobalShortcutActions.showMessage(getString(Res.string.error_generic, "E50010"))
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    },
+                ) {
+                    Text(stringResource(Res.string.dialog_clear))
+                }
+            },
+        ) {
+            Text(
+                stringResource(Res.string.settings_clear_heard_history_dialog_message),
+                style = TextStyle(fontSize = 14.sp, color = DesignColors.InkSecondary),
+                modifier = Modifier.padding(
+                    horizontal = DesignSpacing.DialogRowHorizontal,
+                    vertical = DesignSpacing.Space16,
+                ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ClearSearchHistoryRow(graph: AppGraph) {
+    val scope = rememberCoroutineScope()
+    val searchHistoryRaw by remember(graph) { graph.settings.string(SearchHistoryKey, "") }.collectAsState()
+    val hasSearch = searchHistoryRaw.isNotBlank()
+    var confirmOpen by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(enabled = hasSearch) { confirmOpen = true }
+            .padding(horizontal = DesignSpacing.SettingsRowHorizontal, vertical = DesignSpacing.SettingsRowVertical),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                stringResource(Res.string.settings_clear_search_history),
+                style = TextStyle(
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (hasSearch) DesignColors.Ink else DesignColors.InkSecondary,
+                ),
+            )
+            Text(
+                stringResource(
+                    if (hasSearch) Res.string.settings_clear_search_history_hint
+                    else Res.string.settings_history_nothing_to_clear,
+                ),
+                style = TextStyle(fontSize = 12.sp, color = DesignColors.InkSecondary),
+                modifier = Modifier.padding(top = DesignSpacing.Space2),
+            )
+        }
+    }
+
+    if (confirmOpen) {
+        ElevatedBarDialog(
+            title = stringResource(Res.string.settings_clear_search_history),
+            onDismiss = { if (!busy) confirmOpen = false },
+            canScrollBackward = false,
+            canScrollForward = false,
+            buttons = {
+                DialogSecondaryButton(
+                    stringResource(Res.string.dialog_cancel),
+                    enabled = !busy,
+                    onClick = { confirmOpen = false },
+                )
+                TextButton(
+                    enabled = !busy,
+                    onClick = {
+                        busy = true
+                        scope.launch {
+                            try {
+                                graph.clearSearchHistory()
+                                confirmOpen = false
+                                GlobalShortcutActions.showMessage(getString(Res.string.toast_search_history_cleared))
+                            } catch (c: kotlinx.coroutines.CancellationException) {
+                                throw c
+                            } catch (e: Exception) {
+                                graph.logger?.fork("settings")?.log(Logger.Level.WARN, "clearSearchHistory failed", e)
+                                confirmOpen = false
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    },
+                ) {
+                    Text(stringResource(Res.string.dialog_clear))
+                }
+            },
+        ) {
+            Text(
+                stringResource(Res.string.settings_clear_search_history_dialog_message),
+                style = TextStyle(fontSize = 14.sp, color = DesignColors.InkSecondary),
+                modifier = Modifier.padding(
+                    horizontal = DesignSpacing.DialogRowHorizontal,
+                    vertical = DesignSpacing.Space16,
+                ),
+            )
+        }
     }
 }

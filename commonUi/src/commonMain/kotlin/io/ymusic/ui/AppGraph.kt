@@ -340,6 +340,18 @@ class AppGraph(
     fun requestRefresh() {
         refreshRequests.tryEmit(Unit)
     }
+
+    suspend fun clearHeardHistory() {
+        val history = playHistory
+        if (history != null) {
+            history.clearRepeatEvents()
+        }
+        player.repeatPolicy?.clearAll()
+    }
+
+    suspend fun clearSearchHistory() {
+        settings.putString("search.history", "")
+    }
 }
 
 /** Renaming a media file in its own folder. */

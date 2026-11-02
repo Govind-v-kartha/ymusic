@@ -358,6 +358,21 @@ class PlayHistoryStore(
         }
     }
 
+    suspend fun clearRepeatEvents() {
+        withContext(io) {
+            driver.execute(null, "DELETE FROM repeat_events", 0)
+        }
+    }
+
+    suspend fun hasRepeatEvents(): Boolean = withContext(io) {
+        driver.executeQuery(
+            null,
+            "SELECT 1 FROM repeat_events LIMIT 1",
+            { cursor -> QueryResult.Value(cursor.next().value) },
+            0,
+        ).value
+    }
+
     companion object {
         const val DEFAULT_RETAIN = 200
         const val METADATA_QUOTA = 100

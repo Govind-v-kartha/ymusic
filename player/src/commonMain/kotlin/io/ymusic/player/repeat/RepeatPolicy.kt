@@ -30,6 +30,12 @@ interface RepeatPolicy {
     /** Returns the active rest timestamp for [key] if any and not expired at [now]. */
     fun restUntil(key: String, now: Long): Long?
 
+    /** True if the policy holds any events, active rests, or recent plays in memory. */
+    val hasHistory: Boolean
+
+    /** Clears all in-memory events, active rests, and recent plays. Safe across threads. */
+    fun clearAll()
+
     /**
      * Filters and selects the next item index from [candidates].
      *
