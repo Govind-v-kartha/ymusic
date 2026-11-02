@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        abi: [arm64-v8a, armeabi-v7a, x86_64]
+        abi: [arm64-v8a, armeabi-v7a, x86, x86_64]
     steps:
       - id: cache
         uses: actions/cache@v4
@@ -53,6 +53,13 @@ jobs:
           sudo apt-get update && sudo apt-get install -y nasm automake autoconf libtool pkg-config patchelf
           scripts/build-android.sh "${{ matrix.abi }}"
 
+      - name: Upload ffmpeg pack artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-android-${{ matrix.abi }}
+          path: ffmpeg-build/out/android-${{ matrix.abi }}
+          if-no-files-found: error
+
   build-android:
     name: Build & Release Personal APKs
     needs: ffmpeg-android
@@ -62,26 +69,29 @@ jobs:
         with:
           path: YMusicV4
 
-      - name: Restore ffmpeg android-arm64-v8a
-        uses: actions/cache/restore@v4
+      - name: Download ffmpeg-android-arm64-v8a
+        uses: actions/download-artifact@v4
         with:
+          name: ffmpeg-android-arm64-v8a
           path: ffmpeg-build/out/android-arm64-v8a
-          key: ffmpeg-android-arm64-v8a-${{ env.FFMPEG_BUILD_REF }}-ndk${{ env.NDK_VERSION }}
-          fail-on-cache-miss: true
 
-      - name: Restore ffmpeg android-armeabi-v7a
-        uses: actions/cache/restore@v4
+      - name: Download ffmpeg-android-armeabi-v7a
+        uses: actions/download-artifact@v4
         with:
+          name: ffmpeg-android-armeabi-v7a
           path: ffmpeg-build/out/android-armeabi-v7a
-          key: ffmpeg-android-armeabi-v7a-${{ env.FFMPEG_BUILD_REF }}-ndk${{ env.NDK_VERSION }}
-          fail-on-cache-miss: false
 
-      - name: Restore ffmpeg android-x86_64
-        uses: actions/cache/restore@v4
+      - name: Download ffmpeg-android-x86
+        uses: actions/download-artifact@v4
         with:
+          name: ffmpeg-android-x86
+          path: ffmpeg-build/out/android-x86
+
+      - name: Download ffmpeg-android-x86_64
+        uses: actions/download-artifact@v4
+        with:
+          name: ffmpeg-android-x86_64
           path: ffmpeg-build/out/android-x86_64
-          key: ffmpeg-android-x86_64-${{ env.FFMPEG_BUILD_REF }}-ndk${{ env.NDK_VERSION }}
-          fail-on-cache-miss: false
 
       - uses: actions/setup-java@v4
         with:
