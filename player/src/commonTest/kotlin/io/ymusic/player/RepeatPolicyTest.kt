@@ -290,7 +290,7 @@ class RepeatPolicyTest {
 
         // 2. Play next item:
         q.setLoopMode(LoopMode.None)
-        q.addToPlayNext(listOf(ytItem("vid_play_next")))
+        q.addNext(listOf(ytItem("vid_play_next")))
         // Next peek must return the upNext item index (1)
         assertEquals(1, q.peekNext(userInitiated = false))
 
