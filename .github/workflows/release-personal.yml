@@ -16,82 +16,16 @@ env:
   FFMPEG_BUILD_REPO: ymusic-io/ffmpeg-build
   FFMPEG_BUILD_REF: d0a89492c442dbca24dfabd044b866299f0a97b1
   NDK_VERSION: 28.2.13676358
+  YMUSIC_ABIS: arm64-v8a
 
 jobs:
-  ffmpeg-android:
-    name: ffmpeg android-${{ matrix.abi }}
-    runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        abi: [arm64-v8a, armeabi-v7a, x86, x86_64]
-    steps:
-      - id: cache
-        uses: actions/cache@v4
-        with:
-          path: ffmpeg-build/out/android-${{ matrix.abi }}
-          key: ffmpeg-android-${{ matrix.abi }}-${{ env.FFMPEG_BUILD_REF }}-ndk${{ env.NDK_VERSION }}
-
-      - if: steps.cache.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.FFMPEG_BUILD_REPO }}
-          ref: ${{ env.FFMPEG_BUILD_REF }}
-          path: ffmpeg-build
-          submodules: recursive
-          fetch-depth: 1
-
-      - if: steps.cache.outputs.cache-hit != 'true'
-        name: Install NDK
-        run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" > /dev/null
-          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
-
-      - if: steps.cache.outputs.cache-hit != 'true'
-        working-directory: ffmpeg-build
-        run: |
-          sudo apt-get update && sudo apt-get install -y nasm automake autoconf libtool pkg-config patchelf
-          scripts/build-android.sh "${{ matrix.abi }}"
-
-      - name: Upload ffmpeg pack artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ffmpeg-android-${{ matrix.abi }}
-          path: ffmpeg-build/out/android-${{ matrix.abi }}
-          if-no-files-found: error
-
   build-android:
-    name: Build & Release Personal APKs
-    needs: ffmpeg-android
+    name: Build & Release Personal APK (arm64-v8a)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
           path: YMusicV4
-
-      - name: Download ffmpeg-android-arm64-v8a
-        uses: actions/download-artifact@v4
-        with:
-          name: ffmpeg-android-arm64-v8a
-          path: ffmpeg-build/out/android-arm64-v8a
-
-      - name: Download ffmpeg-android-armeabi-v7a
-        uses: actions/download-artifact@v4
-        with:
-          name: ffmpeg-android-armeabi-v7a
-          path: ffmpeg-build/out/android-armeabi-v7a
-
-      - name: Download ffmpeg-android-x86
-        uses: actions/download-artifact@v4
-        with:
-          name: ffmpeg-android-x86
-          path: ffmpeg-build/out/android-x86
-
-      - name: Download ffmpeg-android-x86_64
-        uses: actions/download-artifact@v4
-        with:
-          name: ffmpeg-android-x86_64
-          path: ffmpeg-build/out/android-x86_64
 
       - uses: actions/setup-java@v4
         with:
@@ -109,6 +43,30 @@ jobs:
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" > /dev/null
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
 
+      - name: Cache ffmpeg android-arm64-v8a
+        id: cache-ffmpeg
+        uses: actions/cache@v4
+        with:
+          path: ffmpeg-build/out/android-arm64-v8a
+          key: ffmpeg-android-arm64-v8a-${{ env.FFMPEG_BUILD_REF }}-ndk${{ env.NDK_VERSION }}
+
+      - name: Checkout ffmpeg-build
+        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.FFMPEG_BUILD_REPO }}
+          ref: ${{ env.FFMPEG_BUILD_REF }}
+          path: ffmpeg-build
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Build ffmpeg android-arm64-v8a
+        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        working-directory: ffmpeg-build
+        run: |
+          sudo apt-get update && sudo apt-get install -y nasm automake autoconf libtool pkg-config patchelf
+          scripts/build-android.sh arm64-v8a
+
       - name: Validate and Prepare Signing Keystore
         working-directory: YMusicV4
         run: |
@@ -123,9 +81,10 @@ jobs:
             exit 1
           fi
 
-      - name: Assemble Release APKs
+      - name: Assemble Release APK
         working-directory: YMusicV4
         env:
+          YMUSIC_ABIS: arm64-v8a
           YMUSIC_ANDROID_STORE_FILE: signing/release.jks
           YMUSIC_ANDROID_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           YMUSIC_ANDROID_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -152,4 +111,4 @@ jobs:
           gh release create "$TAG_NAME" \
             androidApp/build/outputs/apk/release/*.apk \
             --title "Personal Release $TAG_NAME" \
-            --notes "Personal release build with no-repeat + anti-spam feature."
+            --notes "Personal release build (arm64-v8a) with no-repeat + anti-spam feature."
