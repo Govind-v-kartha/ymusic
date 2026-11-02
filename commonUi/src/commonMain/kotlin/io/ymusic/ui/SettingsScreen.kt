@@ -65,6 +65,16 @@ import io.ymusic.ui.resources.settings_eq_hint
 import io.ymusic.ui.resources.settings_language
 import io.ymusic.ui.resources.settings_licenses
 import io.ymusic.ui.resources.settings_licenses_intro
+import io.ymusic.ui.resources.settings_no_repeat_12h
+import io.ymusic.ui.resources.settings_no_repeat_1h
+import io.ymusic.ui.resources.settings_no_repeat_24h
+import io.ymusic.ui.resources.settings_no_repeat_2h
+import io.ymusic.ui.resources.settings_no_repeat_3h
+import io.ymusic.ui.resources.settings_no_repeat_4h
+import io.ymusic.ui.resources.settings_no_repeat_6h
+import io.ymusic.ui.resources.settings_no_repeat_hours
+import io.ymusic.ui.resources.settings_no_repeat_hours_helper
+import io.ymusic.ui.resources.settings_no_repeat_off
 import io.ymusic.ui.resources.settings_section_about
 import io.ymusic.ui.resources.settings_section_appearance
 import io.ymusic.ui.resources.settings_section_content
@@ -323,7 +333,6 @@ private fun AudioFocusRow(graph: AppGraph) {
     }
 }
 
-@Composable
 private val NoRepeatOptions: List<Pair<Int, StringResource>> = listOf(
     0 to Res.string.settings_no_repeat_off,
     1 to Res.string.settings_no_repeat_1h,
@@ -359,7 +368,7 @@ private fun NoRepeatRow(graph: AppGraph) {
             Text(
                 stringResource(Res.string.settings_no_repeat_hours_helper),
                 style = TextStyle(fontSize = 11.sp, color = DesignColors.InkSecondary),
-                modifier = Modifier.padding(top = DesignSpacing.Space1),
+                modifier = Modifier.padding(top = DesignSpacing.Space2),
             )
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
@@ -376,6 +385,7 @@ private fun NoRepeatRow(graph: AppGraph) {
     }
 }
 
+@Composable
 private fun LinkRow(label: StringResource, url: String) {
     val uriHandler = LocalUriHandler.current
     Text(
