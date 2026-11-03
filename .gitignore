@@ -74,3 +74,4 @@ gradle/gradle-daemon-jvm.properties
 *.jks
 *.keystore
 spikes/ios-mse-lab
+branding/preview/
