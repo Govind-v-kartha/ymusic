@@ -103,6 +103,7 @@ object ApkSignatureVerifier {
             } else {
                 @Suppress("DEPRECATION")
                 val info = pm.getPackageInfo(packageName, PackageManager.GET_SIGNATURES)
+
                 @Suppress("DEPRECATION")
                 val signatures: Array<Signature>? = info.signatures
                 signatures?.map { sha256Of(it.toByteArray()) }?.toSet().orEmpty()

@@ -27,9 +27,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okio.Buffer
-import okio.FileSystem
 import okio.HashingSink
-import okio.Path.Companion.toOkioPath
 import okio.blackholeSink
 import okio.buffer
 import okio.sink
@@ -73,6 +71,7 @@ class GitHubAppUpdates(
     private val lock = Any()
 
     private class Following(val release: String, val scope: CoroutineScope)
+
     @Volatile private var following: Following? = null
 
     override val status: StateFlow<AppUpdateStatus> = combine(offer, tracked) { update, tracked ->
@@ -86,6 +85,7 @@ class GitHubAppUpdates(
     override val blockedReason: StringResource? = null
 
     private val downloadDir = File(context.filesDir, "update")
+
     @Volatile private var installAfterPermission = false
     private val log get() = logger?.fork("update")
 

@@ -670,4 +670,8 @@
     <string name="toast_search_history_cleared">Search history cleared</string>
     <string name="changelog_whats_new">Novità</string>
     <string name="settings_check_update_current_hint">Current version: %1$s</string>
+    <string name="settings_song_mix">Song mix</string>
+    <string name="settings_song_mix_hint">Balance familiar languages and mood flow in autoplay</string>
+    <string name="settings_keep_mood">Keep mood</string>
+    <string name="settings_keep_mood_hint">Match calm or energetic tempo with your music flow</string>
 </resources>

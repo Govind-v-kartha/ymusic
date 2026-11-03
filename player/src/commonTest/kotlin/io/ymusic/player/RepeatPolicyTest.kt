@@ -449,6 +449,7 @@ class RepeatPolicyTest {
         assertEquals(now + 5000L, policy.restUntil("vid_rested", now + 1000L))
         assertFalse(policy.isRested("vid_rested", now + 6000L))
     }
+
     @Test
     fun rest_does_not_create_phantom_play_event() {
         val policy = RepeatPolicyImpl(Random(42))
@@ -460,6 +461,7 @@ class RepeatPolicyTest {
         // Rested item has weight 0.0 and was not played; hasEventInWindow must be false
         assertFalse(policy.hasEventInWindow("vid_0", 3600_000L, now))
     }
+
     @Test
     fun clearAll_clears_rests_and_fatigue_and_resets_eligibility() {
         val policy = RepeatPolicyImpl(Random(42))

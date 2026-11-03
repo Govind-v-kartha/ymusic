@@ -211,6 +211,10 @@ interface Player {
         get() = null
         set(_) {}
 
+    var mixPolicy: io.ymusic.player.mix.MixPolicy?
+        get() = null
+        set(_) {}
+
     fun configureRepeatPolicy(
         noRepeatHours: () -> Int,
         onFallbackNotice: (() -> Unit)? = null,

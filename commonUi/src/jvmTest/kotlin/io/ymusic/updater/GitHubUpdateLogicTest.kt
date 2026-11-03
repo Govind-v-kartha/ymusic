@@ -124,4 +124,3 @@ class GitHubUpdateLogicTest {
         assertFalse(GitHubUpdateLogic.verifySha256(content, "0000000000000000000000000000000000000000000000000000000000000000"))
     }
 }
-

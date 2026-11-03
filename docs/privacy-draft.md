@@ -16,9 +16,10 @@ This Privacy Policy describes how this personal build of YMusic handles informat
 The application stores all user data locally on your device:
 1. **Media Library & Playlists (`media.db`):** User playlists, saved songs, document scan indices, and local file metadata.
 2. **Playback History (`play_history.db`):** Local play events, repeat fatigue records, and rest intervals. Users can clear this at any time in Settings › Privacy › "Clear heard history".
-3. **Search History:** Query terms stored in private settings. Users can clear this at any time in Settings › Privacy › "Clear search history".
-4. **Application Logs (`logs.db`):** Rolling internal diagnostic log buffer (up to 5,000 lines). Logs remain on-device and are never transmitted automatically.
-5. **Cache Directories:** Audio and video chunks (`DiskMediaBlobCache`), image thumbnails (`image-source-cache`), and album artwork (`image-cover-cache`) stored in private application cache storage.
+3. **Learned Artist Language & Autoplay Mix:** Local channel language observation counts and session mix context used by the autoplay mix policy. Kept entirely on device in memory, cleared when using "Clear heard history", and never transmitted.
+4. **Search History:** Query terms stored in private settings. Users can clear this at any time in Settings › Privacy › "Clear search history".
+5. **Application Logs (`logs.db`):** Rolling internal diagnostic log buffer (up to 5,000 lines). Logs remain on-device and are never transmitted automatically.
+6. **Cache Directories:** Audio and video chunks (`DiskMediaBlobCache`), image thumbnails (`image-source-cache`), and album artwork (`image-cover-cache`) stored in private application cache storage.
 
 ---
 

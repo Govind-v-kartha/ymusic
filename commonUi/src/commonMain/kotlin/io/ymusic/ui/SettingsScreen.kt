@@ -1,8 +1,5 @@
 package io.ymusic.ui
 
-import io.ymusic.ui.resources.settings_check_update_current_hint
-import io.ymusic.ui.resources.update_check
-
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +20,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -50,26 +48,21 @@ import io.ymusic.settings.BoolSetting
 import io.ymusic.settings.flow
 import io.ymusic.settings.put
 import io.ymusic.ui.resources.Res
-import androidx.compose.material3.TextButton
 import io.ymusic.ui.resources.dialog_cancel
 import io.ymusic.ui.resources.dialog_clear
 import io.ymusic.ui.resources.error_generic
+import io.ymusic.ui.resources.settings_audio_focus
+import io.ymusic.ui.resources.settings_audio_focus_apps
+import io.ymusic.ui.resources.settings_audio_focus_calls
+import io.ymusic.ui.resources.settings_auto_update
+import io.ymusic.ui.resources.settings_auto_update_hint
+import io.ymusic.ui.resources.settings_check_update_current_hint
 import io.ymusic.ui.resources.settings_clear_heard_history
 import io.ymusic.ui.resources.settings_clear_heard_history_dialog_message
 import io.ymusic.ui.resources.settings_clear_heard_history_hint
 import io.ymusic.ui.resources.settings_clear_search_history
 import io.ymusic.ui.resources.settings_clear_search_history_dialog_message
 import io.ymusic.ui.resources.settings_clear_search_history_hint
-import io.ymusic.ui.resources.settings_history_nothing_to_clear
-import io.ymusic.ui.resources.toast_heard_history_cleared
-import io.ymusic.ui.resources.toast_search_history_cleared
-import org.jetbrains.compose.resources.getString
-import io.ymusic.ui.resources.settings_audio_focus
-import io.ymusic.ui.resources.settings_audio_focus_apps
-import io.ymusic.ui.resources.settings_audio_focus_calls
-import io.ymusic.ui.resources.settings_auto_update
-import io.ymusic.ui.resources.settings_auto_update_hint
-import io.ymusic.ui.resources.settings_changelog
 import io.ymusic.ui.resources.settings_content_locale_hint
 import io.ymusic.ui.resources.settings_content_region
 import io.ymusic.ui.resources.settings_crash_reports
@@ -78,9 +71,10 @@ import io.ymusic.ui.resources.settings_debug
 import io.ymusic.ui.resources.settings_enable_pip
 import io.ymusic.ui.resources.settings_enable_pip_hint
 import io.ymusic.ui.resources.settings_eq_hint
+import io.ymusic.ui.resources.settings_history_nothing_to_clear
+import io.ymusic.ui.resources.settings_keep_mood
+import io.ymusic.ui.resources.settings_keep_mood_hint
 import io.ymusic.ui.resources.settings_language
-import io.ymusic.ui.resources.settings_licenses
-import io.ymusic.ui.resources.settings_licenses_intro
 import io.ymusic.ui.resources.settings_section_about
 import io.ymusic.ui.resources.settings_section_appearance
 import io.ymusic.ui.resources.settings_section_content
@@ -90,7 +84,8 @@ import io.ymusic.ui.resources.settings_section_playback
 import io.ymusic.ui.resources.settings_section_privacy
 import io.ymusic.ui.resources.settings_show_fps
 import io.ymusic.ui.resources.settings_show_fps_hint
-import io.ymusic.ui.resources.settings_source_code
+import io.ymusic.ui.resources.settings_song_mix
+import io.ymusic.ui.resources.settings_song_mix_hint
 import io.ymusic.ui.resources.settings_speed_hint
 import io.ymusic.ui.resources.settings_sponsor_block
 import io.ymusic.ui.resources.settings_sponsor_block_hint
@@ -108,6 +103,9 @@ import io.ymusic.ui.resources.settings_versions_engine
 import io.ymusic.ui.resources.settings_versions_player
 import io.ymusic.ui.resources.sound_eq
 import io.ymusic.ui.resources.sound_speed
+import io.ymusic.ui.resources.toast_heard_history_cleared
+import io.ymusic.ui.resources.toast_search_history_cleared
+import io.ymusic.ui.resources.update_check
 import kmpcommon.log.Logger
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.emptyFlow
@@ -115,6 +113,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import projectcommon.error.runSuspendCatching
 
@@ -198,6 +197,18 @@ fun SettingsScreen(graph: AppGraph, signedIn: Boolean = false, onLogin: () -> Un
             ToggleRow(graph, AppSettings.enablePip, Res.string.settings_enable_pip, Res.string.settings_enable_pip_hint)
             if (graph.audioFocusSetting) AudioFocusRow(graph)
             NoRepeatRow(graph)
+            ToggleRow(
+                graph,
+                AppSettings.songMix,
+                Res.string.settings_song_mix,
+                Res.string.settings_song_mix_hint,
+            )
+            ToggleRow(
+                graph,
+                AppSettings.keepMood,
+                Res.string.settings_keep_mood,
+                Res.string.settings_keep_mood_hint,
+            )
             ToggleRow(
                 graph,
                 AppSettings.sponsorBlockEnabled,
@@ -581,7 +592,6 @@ private fun LanguageRow(current: String, onSelect: (String) -> Unit) {
         )
     }
 }
-
 
 @Composable
 private fun ClearHeardHistoryRow(graph: AppGraph) {

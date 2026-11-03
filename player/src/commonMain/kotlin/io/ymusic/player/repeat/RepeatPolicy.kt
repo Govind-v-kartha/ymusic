@@ -59,4 +59,17 @@ interface RepeatPolicy {
         now: Long,
         onFallbackNotice: (() -> Unit)? = null,
     ): Int?
+
+    /**
+     * Filters [candidates] according to fatigue, cooldown, and rest, relaxing through
+     * ladder levels until eligible candidates are found.
+     */
+    fun filterEligibleCandidates(
+        candidates: List<Int>,
+        items: List<PlayableItem>,
+        noRepeatHours: Int,
+        isExempt: (PlayableItem) -> Boolean = { false },
+        now: Long,
+        onFallbackNotice: (() -> Unit)? = null,
+    ): List<Int> = candidates
 }

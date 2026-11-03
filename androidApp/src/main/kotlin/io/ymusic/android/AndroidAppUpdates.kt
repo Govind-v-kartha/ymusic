@@ -395,7 +395,7 @@ class UpdateInstallReceiver : BroadcastReceiver() {
                     "package install ended with status $status: ${intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)}",
                 )
                 val u = app.services.takeIf { it.isCompleted && !it.isCancelled }?.getCompleted()?.updates
-                    (u as? GitHubAppUpdates)?.onInstallEnded() ?: (u as? AndroidAppUpdates)?.onInstallEnded()
+                (u as? GitHubAppUpdates)?.onInstallEnded() ?: (u as? AndroidAppUpdates)?.onInstallEnded()
             }
         }
     }

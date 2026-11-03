@@ -25,7 +25,6 @@ import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.filled.PlayCircleOutline
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
@@ -135,7 +134,6 @@ import io.ymusic.ui.resources.link_unsupported
 import io.ymusic.ui.resources.search_videos
 import io.ymusic.ui.resources.section_catalogue
 import io.ymusic.ui.resources.section_discover
-import io.ymusic.ui.resources.section_donate
 import io.ymusic.ui.resources.section_downloads
 import io.ymusic.ui.resources.section_feedback
 import io.ymusic.ui.resources.section_library

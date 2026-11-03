@@ -388,7 +388,6 @@ internal fun SearchInputBar(
                 .background(DesignColors.FieldPill, RoundedCornerShape(999.dp))
                 .border(1.dp, DesignColors.Outline, RoundedCornerShape(999.dp))
                 .clip(RoundedCornerShape(999.dp))
-
                 // The ✕'s own 8dp inset is the trailing padding while it shows.
                 .padding(start = 16.dp, end = if (value.text.isEmpty()) 16.dp else 0.dp),
             verticalAlignment = Alignment.CenterVertically,

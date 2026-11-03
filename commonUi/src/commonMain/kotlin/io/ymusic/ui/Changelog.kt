@@ -51,6 +51,18 @@ data class ChangelogEntry(
 object ChangelogStore {
     private const val BUNDLED_JSON = """[
   {
+    "id": 5,
+    "version": "Language and mood autoplay mix",
+    "date": "2026-11-03",
+    "notes": [
+      "Smart autoplay balances language preferences and discovery",
+      "Preserves calm or energetic mood flow across songs",
+      "Automatic script detection for Indic, Arabic and world languages",
+      "Local artist language learning with zero telemetry",
+      "Settings toggles for song mix and mood flow"
+    ]
+  },
+  {
     "id": 4,
     "version": "Updater and orange theme",
     "date": "2026-11-03",
@@ -232,4 +244,3 @@ internal fun ChangelogDialog(
         }
     }
 }
-

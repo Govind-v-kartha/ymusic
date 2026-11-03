@@ -49,6 +49,8 @@ internal class IosSettingsStore(
             PlaybackShuffleKey,
             PlaybackLoopModeKey,
             AppSettings.noRepeatHours.key,
+            AppSettings.songMix.key,
+            AppSettings.keepMood.key,
             AppSettings.lastSeenChangelogId.key,
         )
     }

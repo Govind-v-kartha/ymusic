@@ -168,6 +168,12 @@ object AppSettings {
      */
     val noRepeatHours = IntSetting("playback.noRepeatHours", 0)
 
+    /** Song mix toggle (enabled by default; preserves language ratio and variety). */
+    val songMix = BoolSetting("playback.songMix", true)
+
+    /** Keep mood toggle (enabled by default; preserves calm/energetic flow). */
+    val keepMood = BoolSetting("playback.keepMood", true)
+
     /** The sleep-timer dialog's last chosen duration, its starting value next time. */
     val sleepTimerMinutes = IntSetting("playback.sleepTimerMinutes", 30)
 

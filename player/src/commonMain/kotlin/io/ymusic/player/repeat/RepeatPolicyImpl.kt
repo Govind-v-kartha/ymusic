@@ -237,6 +237,66 @@ class RepeatPolicyImpl(
         return selected
     }
 
+    override fun filterEligibleCandidates(
+        candidates: List<Int>,
+        items: List<PlayableItem>,
+        noRepeatHours: Int,
+        isExempt: (PlayableItem) -> Boolean,
+        now: Long,
+        onFallbackNotice: (() -> Unit)?,
+    ): List<Int> {
+        if (candidates.isEmpty()) return emptyList()
+        if (!isReady) return candidates
+
+        var fallbackTriggered = false
+        val eligible = synchronized(lock) {
+            fun gapSet(minGap: Int): Set<String> =
+                if (minGap > 0 && recentAutoPlays.isNotEmpty()) {
+                    recentAutoPlays.takeLast(minGap).toSet()
+                } else {
+                    emptySet()
+                }
+
+            fun isCandidateEligible(idx: Int, minGap: Int, checkFatigue: Boolean): Boolean {
+                val itm = items.getOrNull(idx) ?: return false
+                if (isExempt(itm)) return true
+                val key = itm.repeatKey
+                if (isRested(key, now)) return false
+                if (key in gapSet(minGap)) return false
+                if (checkFatigue && noRepeatHours > 0) {
+                    val fatigue = calculateFatigue(key, now, noRepeatHours)
+                    if (fatigue >= RepeatConfig.FATIGUE_THRESHOLD) return false
+                }
+                return true
+            }
+
+            // Level 0: minGap = 10, checkFatigue = true
+            val l0 = candidates.filter { isCandidateEligible(it, RepeatConfig.MIN_GAP, checkFatigue = true) }
+            if (l0.isNotEmpty()) return@synchronized l0
+
+            // Level 3: minGap = 5, checkFatigue = true
+            val l3 = candidates.filter { isCandidateEligible(it, RepeatConfig.MIN_GAP_RELAXED, checkFatigue = true) }
+            if (l3.isNotEmpty()) return@synchronized l3
+
+            // Level 4: fatigue disabled, minGap = 5
+            val l4 = candidates.filter { isCandidateEligible(it, RepeatConfig.MIN_GAP_RELAXED, checkFatigue = false) }
+            if (l4.isNotEmpty()) {
+                fallbackTriggered = true
+                return@synchronized l4
+            }
+
+            // Level 5: non-rested or all
+            fallbackTriggered = true
+            val nonRested = candidates.filterNot { isRested(items[it].repeatKey, now) }
+            if (nonRested.isNotEmpty()) nonRested else candidates
+        }
+
+        if (fallbackTriggered) {
+            onFallbackNotice?.invoke()
+        }
+        return eligible
+    }
+
     private fun evaluateLadder(
         candidates: List<Int>,
         items: List<PlayableItem>,

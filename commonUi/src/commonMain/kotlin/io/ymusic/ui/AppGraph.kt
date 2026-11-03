@@ -9,6 +9,8 @@ import io.ymusic.mediastore.BetterMediaStore
 import io.ymusic.player.LoopMode
 import io.ymusic.player.PlayableItem
 import io.ymusic.player.Player
+import io.ymusic.player.mix.LearnedArtistLanguageStore
+import io.ymusic.player.mix.MixPolicyImpl
 import io.ymusic.player.repeat.RepeatConfig
 import io.ymusic.player.repeat.RepeatPolicyImpl
 import io.ymusic.remoteconfig.ApiService
@@ -283,6 +285,13 @@ class AppGraph(
     init {
         val repeatPolicy = RepeatPolicyImpl()
         player.repeatPolicy = repeatPolicy
+        val mixPolicy = MixPolicyImpl(
+            artistLanguageStore = LearnedArtistLanguageStore(),
+            songMixEnabled = { settings.flow(AppSettings.songMix).value },
+            keepMoodEnabled = { settings.flow(AppSettings.keepMood).value },
+            logger = logger,
+        )
+        player.mixPolicy = mixPolicy
         player.configureRepeatPolicy(
             noRepeatHours = { settings.flow(AppSettings.noRepeatHours).value },
             onFallbackNotice = {
@@ -347,6 +356,7 @@ class AppGraph(
             history.clearRepeatEvents()
         }
         player.repeatPolicy?.clearAll()
+        player.mixPolicy?.clearHistory()
     }
 
     suspend fun clearSearchHistory() {
