@@ -146,9 +146,6 @@ jobs:
       - name: Build Windows Inno Setup installer and distributable
         shell: bash
         working-directory: YMusicV4
-        env:
-          MSYS_NO_PATHCONV: 1
-          MSYS2_ARG_CONV_EXCL: '*'
         run: >-
           PATH="$(cygpath -u "$MINGW_HOME")/bin:$PATH" ./gradlew -Pproduction=true "-Pinno.iscc=$INNO_ISCC"
           :desktopApp:packageReleaseInnoSetup
@@ -384,38 +381,37 @@ jobs:
           cat -A /tmp/deb-control/control
           echo "=== dpkg-deb --contents ==="
           dpkg-deb --contents "$DEB"
-          echo "=== Install and Smoke Test ==="
-          sudo dpkg -i "$DEB" || sudo apt-get install -f -y
           
-          # Dynamically locate installed directory under /opt
-          OPT_DIRS=($(find /opt -mindepth 1 -maxdepth 1 -type d -name "ymusic*" 2>/dev/null))
-          if [ ${#OPT_DIRS[@]} -eq 0 ]; then
-            echo "Notice: /opt/ymusic* not matched, falling back to all directories in /opt:"
-            find /opt -mindepth 1 -maxdepth 1 -type d
-            OPT_DIRS=($(find /opt -mindepth 1 -maxdepth 1 -type d 2>/dev/null))
-          fi
-          echo "Found /opt directories: ${OPT_DIRS[*]}"
-          INSTALLED_OPT="${OPT_DIRS[0]}"
-          echo "Using installed app directory: $INSTALLED_OPT"
+          # Extract without installing (avoids post-inst scripts that need a desktop
+          # environment, which the CI runner does not have).
+          VERIFY_DIR="$GITHUB_WORKSPACE/deb-verify"
+          rm -rf "$VERIFY_DIR"
+          mkdir -p "$VERIFY_DIR"
+          dpkg-deb -x "$DEB" "$VERIFY_DIR"
+          
+          echo "=== Extracted tree (first 50 entries) ==="
+          find "$VERIFY_DIR" -maxdepth 5 | head -n 50
           
           echo "=== Dynamic link verification (ldd) ==="
-          BIN_PATH=$(find "$INSTALLED_OPT/bin" -type f -executable 2>/dev/null | head -n 1)
+          BIN_PATH=$(find "$VERIFY_DIR" -name "ymusic-personal" -type f -executable 2>/dev/null | head -n 1)
           if [ -n "$BIN_PATH" ] && [ -f "$BIN_PATH" ]; then
             echo "Checking launcher binary: $BIN_PATH"
             ldd "$BIN_PATH"
           else
-            echo "ERROR: Executable launcher not found in $INSTALLED_OPT/bin" >&2
-            ls -la "$INSTALLED_OPT"
+            echo "ERROR: Executable launcher 'ymusic-personal' not found in extracted deb" >&2
+            find "$VERIFY_DIR" -type f -executable
             exit 1
           fi
           
-          JNI_SO=$(find "$INSTALLED_OPT" -name "libmseffmpegjni.so" 2>/dev/null | head -n 1)
+          JNI_SO=$(find "$VERIFY_DIR" -name "libmseffmpegjni.so" 2>/dev/null | head -n 1)
           if [ -n "$JNI_SO" ] && [ -f "$JNI_SO" ]; then
             echo "Checking JNI library: $JNI_SO"
             ldd "$JNI_SO"
           else
-            echo "WARNING: libmseffmpegjni.so not found under $INSTALLED_OPT"
+            echo "WARNING: libmseffmpegjni.so not found in extracted deb"
           fi
+          
+          rm -rf "$VERIFY_DIR"
 
       - name: Verify Linux expected artifacts
         run: |

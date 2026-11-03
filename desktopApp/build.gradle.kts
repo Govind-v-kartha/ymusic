@@ -399,7 +399,6 @@ compose.desktop {
                 // :commonUi's ymusic_logo.xml rendered at 512 px, inset to 7/8 (Main.kt's runtime entry matches).
                 iconFile.set(project.file("ymusic.png"))
                 packageName = "ymusic-personal"
-                installationPath = "/opt/ymusic-personal"
                 appCategory = "sound"
                 menuGroup = "AudioVideo;Audio;Player;"
             }
