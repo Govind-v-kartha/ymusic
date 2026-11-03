@@ -230,9 +230,7 @@ fun SettingsScreen(graph: AppGraph, signedIn: Boolean = false, onLogin: () -> Un
             val config by remember(graph) { graph.remoteConfig ?: emptyFlow() }.collectAsState(initial = null)
             config?.features?.changelogUrl?.let { LinkRow(Res.string.settings_changelog, it) }
             val links = AppLinks(config)
-            LinkRow(Res.string.settings_source_code, links.sourceCode)
             LinkRow(Res.string.settings_terms, links.terms)
-            LicensesRow()
         }
         SettingsSection(Res.string.settings_debug) {
             ToggleRow(graph, AppSettings.showFps, Res.string.settings_show_fps, Res.string.settings_show_fps_hint)
@@ -379,70 +377,6 @@ private fun VersionsRow(graph: AppGraph) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = DesignSpacing.Space2),
         )
-    }
-}
-
-/** Settings → Open source licenses: the shipped third-party components ([OssComponents]) in the
- *  ElevatedBarDialog idiom (see [LocalePickerDialog]). */
-@Composable
-private fun LicensesRow() {
-    var open by remember { mutableStateOf(false) }
-    Text(
-        stringResource(Res.string.settings_licenses),
-        style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = DesignColors.Ink),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { open = true }
-            .padding(horizontal = DesignSpacing.SettingsRowHorizontal, vertical = DesignSpacing.SettingsRowVertical),
-    )
-    if (open) {
-        val listState = rememberLazyListState()
-        val uriHandler = LocalUriHandler.current
-        ElevatedBarDialog(
-            title = stringResource(Res.string.settings_licenses),
-            onDismiss = { open = false },
-            canScrollBackward = listState.canScrollBackward,
-            canScrollForward = listState.canScrollForward,
-            buttons = { DialogSecondaryButton(stringResource(Res.string.dialog_cancel)) { open = false } },
-        ) {
-            LazyColumn(state = listState, modifier = Modifier.fillMaxWidth()) {
-                item("intro") {
-                    Text(
-                        stringResource(Res.string.settings_licenses_intro),
-                        style = TextStyle(fontSize = 12.sp, color = DesignColors.InkSecondary),
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
-                    )
-                }
-                items(OssComponents, key = { it.name }) { c ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { uriHandler.openUri(c.url) }
-                            .padding(horizontal = 24.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                c.name,
-                                style = TextStyle(fontSize = 13.sp, color = DesignColors.Ink),
-                            )
-                            c.scope?.let {
-                                Text(
-                                    it,
-                                    style = TextStyle(fontSize = 11.sp, color = DesignColors.InkMuted),
-                                    modifier = Modifier.padding(top = DesignSpacing.Space2),
-                                )
-                            }
-                        }
-                        Text(
-                            c.license,
-                            style = TextStyle(fontSize = 12.sp, color = DesignColors.InkSecondary),
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 

@@ -684,7 +684,7 @@ class YMusicApplication : Application() {
             systemAudioEffects = true,
             audioFocusSetting = true,
             stats = shared.stats,
-            updates = shared.updates,
+            updates = null,
             premium = premium,
             openDonation = null,
             shareText = { text ->
