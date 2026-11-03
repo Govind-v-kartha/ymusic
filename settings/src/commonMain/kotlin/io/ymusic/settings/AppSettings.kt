@@ -103,6 +103,9 @@ object AppSettings {
     /** The versionCode of the last launch (0 = none recorded), for the "updated" notice. */
     val lastRunVersionCode = IntSetting("update.lastRunVersionCode", 0)
 
+    /** The sequential integer id of the newest changelog entry seen by the user. */
+    val lastSeenChangelogId = IntSetting("changelog.lastSeenId", 0)
+
     /**
      * The sha256 of the release whose automatic download failed. That release is never fetched
      * automatically again — the user downloads it from the update dialog — while a corrected one

@@ -1270,7 +1270,7 @@ private fun AppRoot(
                     }
                 }
                 UpdateDialog(graph, recheck = updateRecheck)
-                UpgradeSnackbar(graph, snackbarHostState)
+                WhatNewDialog(graph)
                 if (checkingUpdate) {
                     CheckUpdateDialog(graph) { found ->
                         checkingUpdate = false

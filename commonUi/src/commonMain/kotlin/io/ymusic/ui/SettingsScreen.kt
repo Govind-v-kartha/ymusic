@@ -227,8 +227,8 @@ fun SettingsScreen(graph: AppGraph, signedIn: Boolean = false, onLogin: () -> Un
             if (graph.updates != null) {
                 ToggleRow(graph, AppSettings.autoDownloadUpdates, Res.string.settings_auto_update, Res.string.settings_auto_update_hint)
             }
+            ChangelogRow()
             val config by remember(graph) { graph.remoteConfig ?: emptyFlow() }.collectAsState(initial = null)
-            config?.features?.changelogUrl?.let { LinkRow(Res.string.settings_changelog, it) }
             val links = AppLinks(config)
             LinkRow(Res.string.settings_terms, links.terms)
         }

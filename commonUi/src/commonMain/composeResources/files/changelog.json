@@ -1,0 +1,15 @@
+[
+  {
+    "id": 1,
+    "version": "v4.0.0-personal.1",
+    "date": "2026-11-03",
+    "notes": [
+      "No-repeat window setting (1h, 2h, 3h, 4h, 6h, 12h, 24h) preventing recent song repetition",
+      "Anti-spam repeat policy with fatigue decay and affinity preservation",
+      "Rest this song action in playback 3-dot overflow menu (1h, 3h, 12h, 24h)",
+      "Compact no-repeat chip on Discover home screen and Now Playing menus",
+      "Clear heard history and clear search history actions in Settings",
+      "Personal release build targeting arm64-v8a with streamlined packaging"
+    ]
+  }
+]

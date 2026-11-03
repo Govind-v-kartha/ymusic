@@ -49,6 +49,7 @@ internal class IosSettingsStore(
             PlaybackShuffleKey,
             PlaybackLoopModeKey,
             AppSettings.noRepeatHours.key,
+            AppSettings.lastSeenChangelogId.key,
         )
     }
 }

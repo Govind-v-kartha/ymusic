@@ -668,4 +668,5 @@
     <string name="dialog_clear">Clear</string>
     <string name="toast_heard_history_cleared">Heard history cleared</string>
     <string name="toast_search_history_cleared">Search history cleared</string>
+    <string name="changelog_whats_new">Novedades</string>
 </resources>
