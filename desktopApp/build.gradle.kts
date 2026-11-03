@@ -658,7 +658,6 @@ val packageReleaseInnoSetup by tasks.registering(Exec::class) {
         val out = innoSetupOutDir.get().asFile.apply { mkdirs() }
         commandLine(
             isccPath.get().absolutePath,
-            "/Qp",
             "/DAppVersion=$desktopVersion",
             "/DAppPublisher=Govind-v-kartha",
             "/DAppURL=https://github.com/Govind-v-kartha/ymusic",
