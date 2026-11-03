@@ -102,9 +102,8 @@ jobs:
           [ -n "$iscc" ] || { choco install innosetup --version "$INNO_SETUP_VERSION" -y --no-progress; iscc="$(find_iscc)"; }
           [ -n "$iscc" ] || { echo "ISCC.exe not found after installing Inno Setup" >&2; exit 1; }
           echo "using $iscc"
-          echo "INNO_ISCC=$(cygpath -w "$iscc")" >> "$GITHUB_ENV"
+          echo "INNO_ISCC=$(cygpath -m "$iscc")" >> "$GITHUB_ENV"
           echo "$(dirname "$iscc")" >> "$GITHUB_PATH"
-          "$iscc" /? | head -n 5
 
       - name: Setup Java 21
         uses: actions/setup-java@v4
@@ -147,6 +146,9 @@ jobs:
       - name: Build Windows Inno Setup installer and distributable
         shell: bash
         working-directory: YMusicV4
+        env:
+          MSYS_NO_PATHCONV: 1
+          MSYS2_ARG_CONV_EXCL: '*'
         run: >-
           PATH="$(cygpath -u "$MINGW_HOME")/bin:$PATH" ./gradlew -Pproduction=true "-Pinno.iscc=$INNO_ISCC"
           :desktopApp:packageReleaseInnoSetup
@@ -185,11 +187,12 @@ jobs:
         shell: bash
         run: |
           mkdir -p "$GITHUB_WORKSPACE/artifacts"
-          SETUP_EXE=$(find "$GITHUB_WORKSPACE/YMusicV4/desktopApp/build/compose/binaries/main-release/innosetup" -maxdepth 1 -name '*.exe' 2>/dev/null | head -n 1)
-          if [ -z "$SETUP_EXE" ] || [ ! -f "$SETUP_EXE" ]; then
-            echo "ERROR: Inno Setup executable not found in compose/binaries/main-release/innosetup" >&2
+          SETUP_EXES=($(find "$GITHUB_WORKSPACE/YMusicV4/desktopApp/build/compose/binaries/main-release/innosetup" -maxdepth 1 -name '*.exe' 2>/dev/null))
+          if [ ${#SETUP_EXES[@]} -ne 1 ]; then
+            echo "ERROR: Expected exactly 1 Inno Setup executable in compose/binaries/main-release/innosetup, found ${#SETUP_EXES[@]}: ${SETUP_EXES[*]}" >&2
             exit 1
           fi
+          SETUP_EXE="${SETUP_EXES[0]}"
           echo "Found Inno Setup installer: $SETUP_EXE"
           cp "$SETUP_EXE" "$GITHUB_WORKSPACE/artifacts/YMusic-${TAG}-windows-x64-setup.exe"
           ls -lh "$GITHUB_WORKSPACE/artifacts/YMusic-${TAG}-windows-x64-setup.exe"
@@ -331,11 +334,12 @@ jobs:
       - name: Package Linux Debian package
         run: |
           mkdir -p "$GITHUB_WORKSPACE/artifacts"
-          DEB_FILE=$(find "$GITHUB_WORKSPACE/YMusicV4/desktopApp/build/compose/binaries/main-release/deb" -maxdepth 1 -name '*.deb' 2>/dev/null | head -n 1)
-          if [ -z "$DEB_FILE" ] || [ ! -f "$DEB_FILE" ]; then
-            echo "ERROR: Debian package not found in compose/binaries/main-release/deb" >&2
+          DEB_FILES=($(find "$GITHUB_WORKSPACE/YMusicV4/desktopApp/build/compose/binaries/main-release/deb" -maxdepth 1 -name '*.deb' 2>/dev/null))
+          if [ ${#DEB_FILES[@]} -ne 1 ]; then
+            echo "ERROR: Expected exactly 1 Debian package in compose/binaries/main-release/deb, found ${#DEB_FILES[@]}: ${DEB_FILES[*]}" >&2
             exit 1
           fi
+          DEB_FILE="${DEB_FILES[0]}"
           echo "Found Debian package: $DEB_FILE"
           cp "$DEB_FILE" "$GITHUB_WORKSPACE/artifacts/YMusic-${TAG}-linux-x64.deb"
           ls -lh "$GITHUB_WORKSPACE/artifacts/YMusic-${TAG}-linux-x64.deb"
@@ -351,13 +355,20 @@ jobs:
           rm -rf "$EXTRACT_DIR"
           mkdir -p "$EXTRACT_DIR"
           dpkg-deb -x "$DEB" "$EXTRACT_DIR"
-          OPT_DIR="$EXTRACT_DIR/opt/ymusic-personal"
-          if [ ! -d "$OPT_DIR" ]; then
-            echo "ERROR: Expected directory /opt/ymusic-personal not found in extracted deb" >&2
+          
+          # Dynamically discover installed app folder under /opt
+          OPT_DIRS=($(find "$EXTRACT_DIR/opt" -mindepth 1 -maxdepth 1 -type d 2>/dev/null))
+          if [ ${#OPT_DIRS[@]} -ne 1 ]; then
+            echo "ERROR: Expected exactly 1 directory under $EXTRACT_DIR/opt, found ${#OPT_DIRS[@]}: ${OPT_DIRS[*]}" >&2
+            ls -laR "$EXTRACT_DIR/opt" || true
             exit 1
           fi
+          OPT_DIR="${OPT_DIRS[0]}"
+          APP_NAME=$(basename "$OPT_DIR")
+          echo "Discovered installed app directory under /opt: $APP_NAME ($OPT_DIR)"
+          
           echo "Building portable tar.gz from $OPT_DIR"
-          (cd "$EXTRACT_DIR/opt" && tar -czf "$GITHUB_WORKSPACE/artifacts/YMusic-${TAG}-linux-x64.tar.gz" ymusic-personal)
+          (cd "$EXTRACT_DIR/opt" && tar -czf "$GITHUB_WORKSPACE/artifacts/YMusic-${TAG}-linux-x64.tar.gz" "$APP_NAME")
           ls -lh "$GITHUB_WORKSPACE/artifacts/YMusic-${TAG}-linux-x64.tar.gz"
           echo "=== Portable tar.gz file listing (first 30 entries) ==="
           tar -ztvf "$GITHUB_WORKSPACE/artifacts/YMusic-${TAG}-linux-x64.tar.gz" | head -n 30
@@ -375,9 +386,36 @@ jobs:
           dpkg-deb --contents "$DEB"
           echo "=== Install and Smoke Test ==="
           sudo dpkg -i "$DEB" || sudo apt-get install -f -y
+          
+          # Dynamically locate installed directory under /opt
+          OPT_DIRS=($(find /opt -mindepth 1 -maxdepth 1 -type d -name "ymusic*" 2>/dev/null))
+          if [ ${#OPT_DIRS[@]} -eq 0 ]; then
+            echo "Notice: /opt/ymusic* not matched, falling back to all directories in /opt:"
+            find /opt -mindepth 1 -maxdepth 1 -type d
+            OPT_DIRS=($(find /opt -mindepth 1 -maxdepth 1 -type d 2>/dev/null))
+          fi
+          echo "Found /opt directories: ${OPT_DIRS[*]}"
+          INSTALLED_OPT="${OPT_DIRS[0]}"
+          echo "Using installed app directory: $INSTALLED_OPT"
+          
           echo "=== Dynamic link verification (ldd) ==="
-          ldd /opt/ymusic-personal/bin/ymusic-personal
-          ldd /opt/ymusic-personal/lib/app/resources/common/libmseffmpegjni.so
+          BIN_PATH=$(find "$INSTALLED_OPT/bin" -type f -executable 2>/dev/null | head -n 1)
+          if [ -n "$BIN_PATH" ] && [ -f "$BIN_PATH" ]; then
+            echo "Checking launcher binary: $BIN_PATH"
+            ldd "$BIN_PATH"
+          else
+            echo "ERROR: Executable launcher not found in $INSTALLED_OPT/bin" >&2
+            ls -la "$INSTALLED_OPT"
+            exit 1
+          fi
+          
+          JNI_SO=$(find "$INSTALLED_OPT" -name "libmseffmpegjni.so" 2>/dev/null | head -n 1)
+          if [ -n "$JNI_SO" ] && [ -f "$JNI_SO" ]; then
+            echo "Checking JNI library: $JNI_SO"
+            ldd "$JNI_SO"
+          else
+            echo "WARNING: libmseffmpegjni.so not found under $INSTALLED_OPT"
+          fi
 
       - name: Verify Linux expected artifacts
         run: |

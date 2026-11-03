@@ -292,6 +292,14 @@ tasks.register<JavaExec>("catalogue") {
     mainClass.set("io.ymusic.desktop.CatalogueMainKt")
 }
 
+val hostOs = org.gradle.internal.os.OperatingSystem.current().let {
+    if (it.isMacOsX) "macos" else if (it.isWindows) "windows" else "linux"
+}
+val hostArm64 = System.getProperty("os.arch").lowercase() in setOf("aarch64", "arm64")
+
+/** `macos-x64`, `windows-x64`, …: the update service's platform key, and the installer's suffix. */
+val hostPlatform = "$hostOs-${if (hostArm64) "arm64" else "x64"}"
+
 compose.desktop {
     application {
         mainClass = "io.ymusic.desktop.MainKt"
@@ -390,6 +398,8 @@ compose.desktop {
             linux {
                 // :commonUi's ymusic_logo.xml rendered at 512 px, inset to 7/8 (Main.kt's runtime entry matches).
                 iconFile.set(project.file("ymusic.png"))
+                packageName = "ymusic-personal"
+                installationPath = "/opt/ymusic-personal"
                 appCategory = "sound"
                 menuGroup = "AudioVideo;Audio;Player;"
             }
@@ -419,13 +429,6 @@ tasks.matching {
 // A package is built on, and for, one OS and CPU: the host's. sqlite-jdbc, JNA, skiko and our own
 // jni/ jars carry natives for others, which are dead weight there. They are dropped from the
 // ProGuard output — what jpackage consumes — in the same pass that normalizes entry timestamps.
-val hostOs = org.gradle.internal.os.OperatingSystem.current().let {
-    if (it.isMacOsX) "macos" else if (it.isWindows) "windows" else "linux"
-}
-val hostArm64 = System.getProperty("os.arch").lowercase() in setOf("aarch64", "arm64")
-
-/** `macos-x64`, `windows-x64`, …: the update service's platform key, and the installer's suffix. */
-val hostPlatform = "$hostOs-${if (hostArm64) "arm64" else "x64"}"
 
 // macOS 26 re-renders a bundle that has only an .icns into a flat Liquid Glass tile, dropping
 // the rings. Assets.car is compiled from macos/YMusic.icon (macos/build-icon.sh, needs Xcode 26);
@@ -656,8 +659,8 @@ val packageReleaseInnoSetup by tasks.registering(Exec::class) {
 
     doFirst {
         val out = innoSetupOutDir.get().asFile.apply { mkdirs() }
-        commandLine(
-            isccPath.get().absolutePath,
+        val isccExecutable = isccPath.get().absolutePath
+        val args = listOf(
             "/DAppVersion=$desktopVersion",
             "/DAppPublisher=Govind-v-kartha",
             "/DAppURL=https://github.com/Govind-v-kartha/ymusic",
@@ -669,5 +672,14 @@ val packageReleaseInnoSetup by tasks.registering(Exec::class) {
             "/DOutputBaseName=YMusic-Setup-$desktopVersion-$hostPlatform",
             script.absolutePath,
         )
+        println("=== ISCC Invocation ===")
+        println("Executable: $isccExecutable")
+        println("Arguments (${args.size}):")
+        args.forEachIndexed { i, arg -> println("  [$i] $arg") }
+        println("Script file exists: ${script.isFile} (${script.absolutePath})")
+        println("App directory exists: ${appDir.get().asFile.isDirectory} (${appDir.get().asFile.absolutePath})")
+        println("Output directory: ${out.absolutePath}")
+        println("=======================")
+        commandLine(listOf(isccExecutable) + args)
     }
 }
