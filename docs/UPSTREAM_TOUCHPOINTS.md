@@ -68,11 +68,33 @@ Changes are designed with minimal invasive footprint:
 
 ---
 
-## 3. Merge Conflict Analysis with `upstream/master`
-Trial merge simulation against `upstream/master` results:
-- **Clean automatic merge**: All isolated modules (`PersonalTheme.kt`, `NoRepeatControl.kt`, `Changelog.kt`, icon generation tools) merge with zero conflicts.
-- **Expected Touchpoint Merges**:
-  - `commonUi/src/commonMain/kotlin/io/ymusic/ui/App.kt`: Clean 1-line hook merge.
-  - `commonUi/.../values-*/strings.xml`: Git's three-way merge cleanly appends the new keys at the end of `<resources>`.
-  - `AndroidManifest.xml`: Clean deletion of personal deep links.
+## 3. Upstream Overlap & Risk Analysis
+Analysis of modified files against upstream change frequency in its last 200 commits (`git log upstream/master -200 --name-only`):
+- Total files modified in personal build: 137
+- Total files with upstream touches: 13
+- Total files with zero upstream touches: 124
+
+### Overlapping Files Ranked by Upstream Change Frequency
+| File | Upstream Commits (Last 200) | Personal Modification | Merge Risk Level |
+| :--- | :---: | :--- | :--- |
+| `androidApp/src/main/kotlin/io/ymusic/android/YMusicApplication.kt` | 18 | App initialization, notification channel setup | High |
+| `.github/workflows/release.yml` | 12 | Release workflow triggers and secrets | High |
+| `androidApp/build.gradle.kts` | 4 | Dependency configuration, packaging | Medium |
+| `player/src/commonMain/kotlin/io/ymusic/player/PlayerImpl.kt` | 4 | No-repeat queue hook & completion callback | Medium |
+| `error-codes.txt` | 2 | Ledger error code allocation | Low |
+| `commonUi/src/commonMain/kotlin/io/ymusic/ui/NowPlaying.kt` | 2 | Rest this song menu item, overflow action | Medium |
+| `commonUi/src/commonMain/kotlin/io/ymusic/ui/AppLinks.kt` | 1 | Hardcoded personal links and support | Low |
+| `commonUi/src/commonMain/kotlin/io/ymusic/ui/SettingsScreen.kt` | 1 | No-repeat section and changelog action | Low |
+| `commonUi/src/commonMain/kotlin/io/ymusic/ui/UpdateDialog.kt` | 1 | Custom release link and text styling | Low |
+| `commonUi/src/commonMain/kotlin/io/ymusic/ui/App.kt` | 1 | Single-line theme hook & dialog wiring | Low |
+| `player/src/commonMain/kotlin/io/ymusic/player/Player.kt` | 1 | RepeatPolicy interface wiring | Low |
+| `player/src/commonMain/kotlin/io/ymusic/player/Queue.kt` | 1 | Queue population filter delegate | Low |
+| `desktopApp/ymusic.png` | 1 | Binary desktop icon asset | Low |
+
+### Top 5 Riskiest Files for Future Upstream Merges
+1. **`androidApp/src/main/kotlin/io/ymusic/android/YMusicApplication.kt`** (18 touches): High-activity upstream file handling core application lifecycle and services. Changes should remain strictly appended to lifecycle callbacks.
+2. **`.github/workflows/release.yml`** (12 touches): Active CI/CD workflow where upstream updates action versions and runners.
+3. **`androidApp/build.gradle.kts`** (4 touches): Build script subject to upstream dependency bumps and AGP configuration updates.
+4. **`player/src/commonMain/kotlin/io/ymusic/player/PlayerImpl.kt`** (4 touches): Core playback engine state machine; personal repeat policy hooks must remain narrow and delegative.
+5. **`commonUi/src/commonMain/kotlin/io/ymusic/ui/NowPlaying.kt`** (2 touches): Substantial UI composable where menu actions and gestures frequently evolve upstream.
 
