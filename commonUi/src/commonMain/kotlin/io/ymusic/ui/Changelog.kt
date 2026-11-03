@@ -203,7 +203,7 @@ internal fun ChangelogDialog(
                             Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(
                                     "*",
-                                    style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DesignColors.Accent),
+                                    style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DesignColors.InkSecondary),
                                 )
                                 Text(
                                     note,

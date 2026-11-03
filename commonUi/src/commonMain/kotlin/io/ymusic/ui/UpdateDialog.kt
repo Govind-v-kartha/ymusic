@@ -141,7 +141,7 @@ fun UpdateDialog(graph: AppGraph, recheck: Int = 0) {
                 if (inPlace && download is UpdateDownload.Ready) {
                     Text(
                         stringResource(Res.string.update_ready),
-                        style = TextStyle(fontSize = 13.sp, color = DesignColors.Accent),
+                        style = TextStyle(fontSize = 13.sp, color = DesignColors.InkSecondary),
                     )
                 }
             }

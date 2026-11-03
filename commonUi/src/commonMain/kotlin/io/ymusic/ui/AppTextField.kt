@@ -56,7 +56,7 @@ fun AppTextField(
         cursorColor = DesignColors.Accent,
         errorCursorColor = MaterialTheme.colorScheme.error,
         focusedIndicatorColor = DesignColors.Accent,
-        unfocusedIndicatorColor = DesignColors.OutlineSoft,
+        unfocusedIndicatorColor = DesignColors.Outline,
         errorIndicatorColor = MaterialTheme.colorScheme.error,
         focusedLabelColor = DesignColors.Accent,
         unfocusedLabelColor = DesignColors.InkSecondary,

@@ -13,6 +13,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.ScrollableState
 import androidx.compose.foundation.gestures.animateScrollBy
@@ -384,8 +385,10 @@ internal fun SearchInputBar(
             Modifier
                 .weight(1f)
                 .height(40.dp)
+                .background(DesignColors.FieldPill, RoundedCornerShape(999.dp))
+                .border(1.dp, DesignColors.Outline, RoundedCornerShape(999.dp))
                 .clip(RoundedCornerShape(999.dp))
-                .background(DesignColors.FieldPill)
+
                 // The ✕'s own 8dp inset is the trailing padding while it shows.
                 .padding(start = 16.dp, end = if (value.text.isEmpty()) 16.dp else 0.dp),
             verticalAlignment = Alignment.CenterVertically,
