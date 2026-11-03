@@ -51,6 +51,17 @@ data class ChangelogEntry(
 object ChangelogStore {
     private const val BUNDLED_JSON = """[
   {
+    "id": 3,
+    "version": "Retheme",
+    "date": "2026-11-03",
+    "notes": [
+      "New royal blue design palette with high contrast light and dark themes",
+      "Full WCAG 2.1 AA compliant contrast across text, cards, controls and surfaces",
+      "Drawer brand badge and player widget colors aligned with royal blue theme",
+      "System splash and window backgrounds matched to palette surfaces"
+    ]
+  },
+  {
     "id": 2,
     "version": "Rebrand",
     "date": "2026-11-03",
