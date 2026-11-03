@@ -280,18 +280,6 @@ def main():
     with open(os.path.join(drawable_dir, "ic_notification.xml"), "w", encoding="utf-8") as f:
         f.write(notif_xml)
 
-    # Also render ic_notification.png raster for fallback notification systems
-    notif_png = Image.new("RGBA", (96, 96), (0, 0, 0, 0))
-    notif_mask_scaled = fg_mask.crop((min_x, min_y, max_x + 1, max_y + 1)).resize(
-        (int(round(bbox_w * (80.0 / bounding_circle_diam))), int(round(bbox_h * (80.0 / bounding_circle_diam)))),
-        Image.Resampling.LANCZOS
-    )
-    white_fill = Image.new("RGBA", notif_mask_scaled.size, (255, 255, 255, 255))
-    white_fill.putalpha(notif_mask_scaled)
-    n_pos_x = (96 - notif_mask_scaled.width) // 2
-    n_pos_y = (96 - notif_mask_scaled.height) // 2
-    notif_png.paste(white_fill, (n_pos_x, n_pos_y), white_fill)
-    notif_png.save(os.path.join(drawable_dir, "ic_notification.png"))
 
     # In-app Compose logo: commonUi ymusic_logo.xml (192dp)
     logo_vp = 1024
