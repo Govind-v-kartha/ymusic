@@ -1,5 +1,8 @@
 package io.ymusic.ui
 
+import io.ymusic.ui.resources.settings_check_update_current_hint
+import io.ymusic.ui.resources.update_check
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -223,6 +226,7 @@ fun SettingsScreen(graph: AppGraph, signedIn: Boolean = false, onLogin: () -> Un
         }
         SettingsSection(Res.string.settings_section_about) {
             VersionsRow(graph)
+            CheckUpdateRow(graph)
             // Download updates in the background (on by default); installing still waits for a tap.
             if (graph.updates != null) {
                 ToggleRow(graph, AppSettings.autoDownloadUpdates, Res.string.settings_auto_update, Res.string.settings_auto_update_hint)
@@ -751,6 +755,47 @@ private fun ClearSearchHistoryRow(graph: AppGraph) {
                     vertical = DesignSpacing.Space16,
                 ),
             )
+        }
+    }
+}
+
+@Composable
+private fun CheckUpdateRow(graph: AppGraph) {
+    var checking by remember { mutableStateOf(false) }
+    val updates = graph.updates
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable {
+                if (updates != null) {
+                    checking = true
+                } else {
+                    uriHandler.openUri("https://github.com/Govind-v-kartha/ymusic/releases")
+                }
+            }
+            .padding(horizontal = DesignSpacing.SettingsRowHorizontal, vertical = DesignSpacing.SettingsRowVertical),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                stringResource(Res.string.update_check),
+                style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = DesignColors.Ink),
+            )
+            val currentVer = graph.appVersionName ?: graph.appVersionCode?.toString() ?: "—"
+            Text(
+                stringResource(Res.string.settings_check_update_current_hint, currentVer),
+                style = TextStyle(fontSize = 12.sp, color = DesignColors.InkSecondary),
+                modifier = Modifier.padding(top = DesignSpacing.Space2),
+            )
+        }
+    }
+
+    if (checking) {
+        CheckUpdateDialog(graph) {
+            checking = false
         }
     }
 }

@@ -163,7 +163,7 @@ class SharedServices(
     val playerJs: JsSourceProvider,
     val imageLoader: ImageLoader,
     val stats: StatUsage,
-    val updates: AndroidAppUpdates,
+    val updates: io.ymusic.ui.AppUpdates,
     /** The YMusic service; null when this build has no service url. */
     val api: ApiService?,
     val remoteConfig: RemoteConfig,
@@ -454,19 +454,13 @@ class YMusicApplication : Application() {
             logger = rootLogger,
             ioDispatcher = Dispatchers.IO,
         )
-        // In-app updates from the config's appUpdate.
-        val updates = AndroidAppUpdates(
+        // In-app updates querying personal GitHub Releases
+        val updates = GitHubAppUpdates(
             context = this,
             client = http.engine,
             currentVersionCode = BuildConfig.VERSION_CODE,
             scope = scope,
             logger = rootLogger,
-            autoDownload = { settings.flow(AppSettings.autoDownloadUpdates).value },
-            autoDownloadFailed = { settings.flow(AppSettings.updateAutoDownloadFailed).value },
-            rememberAutoDownloadFailed = { settings.put(AppSettings.updateAutoDownloadFailed, it) },
-            freshConfig = { remoteConfig.awaitFresh(timeoutMs = 3_000L) },
-            downloadSite = { remoteConfig.config.value.features.downloadPageUrl },
-            configUpdates = remoteConfig.appUpdate,
         )
         updates.pruneDownloads()
         return SharedServices(http, cookies, settings, engines, cacheStore, mediaStore, playerJs, imageLoader, stats, updates, api, remoteConfig, runningBundles)
@@ -684,7 +678,7 @@ class YMusicApplication : Application() {
             systemAudioEffects = true,
             audioFocusSetting = true,
             stats = shared.stats,
-            updates = null,
+            updates = shared.updates,
             premium = premium,
             openDonation = null,
             shareText = { text ->

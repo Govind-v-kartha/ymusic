@@ -661,4 +661,5 @@
     <string name="toast_heard_history_cleared">Heard history cleared</string>
     <string name="toast_search_history_cleared">Search history cleared</string>
     <string name="changelog_whats_new">Was ist neu</string>
+    <string name="settings_check_update_current_hint">Current version: %1$s</string>
 </resources>

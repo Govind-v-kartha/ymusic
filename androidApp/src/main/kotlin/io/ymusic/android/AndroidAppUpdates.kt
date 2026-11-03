@@ -383,7 +383,8 @@ class UpdateInstallReceiver : BroadcastReceiver() {
                 } catch (error: ActivityNotFoundException) {
                     val app = context.applicationContext as? YMusicApplication ?: return
                     app.rootLogger.fork("update").log(Logger.Level.WARN, "no screen confirms the package install", error)
-                    app.services.takeIf { it.isCompleted && !it.isCancelled }?.getCompleted()?.updates?.onInstallEnded()
+                    val u = app.services.takeIf { it.isCompleted && !it.isCancelled }?.getCompleted()?.updates
+                    (u as? GitHubAppUpdates)?.onInstallEnded() ?: (u as? AndroidAppUpdates)?.onInstallEnded()
                 }
             }
             PackageInstaller.STATUS_SUCCESS -> Unit
@@ -393,7 +394,8 @@ class UpdateInstallReceiver : BroadcastReceiver() {
                     Logger.Level.WARN,
                     "package install ended with status $status: ${intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)}",
                 )
-                app.services.takeIf { it.isCompleted && !it.isCancelled }?.getCompleted()?.updates?.onInstallEnded()
+                val u = app.services.takeIf { it.isCompleted && !it.isCancelled }?.getCompleted()?.updates
+                    (u as? GitHubAppUpdates)?.onInstallEnded() ?: (u as? AndroidAppUpdates)?.onInstallEnded()
             }
         }
     }

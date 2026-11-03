@@ -29,7 +29,9 @@ All streaming, search, and download traffic is established directly between your
    - If signed in via WebView, authentication cookies (`SID`, `HSID`, `SSID`, `LOGIN_INFO`) are stored in the local secure cookie jar and sent only to Google domains to maintain your session.
 2. **SponsorBlock API:**
    - If enabled in Settings, the app queries `sponsor.ajay.app` with the video identifier to fetch skip timestamps.
-3. **Telemetry & Crash Reports:**
+3. **In-App Updates (GitHub):**
+   - The update check contacts github.com only when the user taps the button, and GitHub can see the IP address.
+4. **Telemetry & Crash Reports:**
    - Opt-in error reporting via Sentry (if configured at build time). No analytics or advertising SDKs are included.
    - When submitting feedback manually, logs are packaged into an anonymous report only with explicit user consent.
 

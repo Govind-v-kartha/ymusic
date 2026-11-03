@@ -1,5 +1,16 @@
 [
   {
+    "id": 4,
+    "version": "Updater",
+    "date": "2026-11-03",
+    "notes": [
+      "Direct in-app update check querying personal GitHub releases",
+      "In-app APK download with size cap and SHA-256 verification",
+      "Cryptographic APK package and signing certificate verification before install",
+      "Check for updates action in Settings with current version display"
+    ]
+  },
+  {
     "id": 3,
     "version": "Retheme",
     "date": "2026-11-03",
