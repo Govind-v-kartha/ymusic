@@ -307,7 +307,7 @@ fun App(
     key(tag) {
         val direction = if (isRtlLanguage(Locale.current.language)) LayoutDirection.Rtl else LayoutDirection.Ltr
         CompositionLocalProvider(LocalLayoutDirection provides direction) {
-            YMusicTheme(palette) {
+            YMusicTheme(io.ymusic.personal.personalDesignPalette(palette)) {
                 val platformUriHandler = LocalUriHandler.current
                 val uriHandler = remember(platformUriHandler) { SafeUriHandler(platformUriHandler, graph.logger?.fork("uri-handler")) }
                 CompositionLocalProvider(
