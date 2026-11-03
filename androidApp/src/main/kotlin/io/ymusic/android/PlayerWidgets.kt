@@ -306,11 +306,11 @@ class PlayerWidgets(
         const val COMPACT_PREV_MIN_DP = 250
         const val LARGE_ART_MIN_DP = 260
         val FALLBACK_PALETTE = WidgetPalette(
-            card = 0xFF1E293B.toInt(),
-            title = 0xFFF8FAFC.toInt(),
-            subtitle = 0xFF94A3B8.toInt(),
-            playBg = 0xFF3B82F6.toInt(),
-            playIcon = 0xFF0F172A.toInt(),
+            card = 0xFF221C18.toInt(),
+            title = 0xFFFAF6F2.toInt(),
+            subtitle = 0xFFB7A99E.toInt(),
+            playBg = 0xFFF43F18.toInt(),
+            playIcon = 0xFF151210.toInt(),
         )
     }
 }
@@ -359,14 +359,14 @@ private fun deriveArt(url: String, source: Bitmap): WidgetArt {
 }
 
 private fun Palette.toWidgetPalette(): WidgetPalette {
-    val base = (darkMutedSwatch ?: darkVibrantSwatch ?: dominantSwatch)?.rgb ?: 0xFF1E293B.toInt()
+    val base = (darkMutedSwatch ?: darkVibrantSwatch ?: dominantSwatch)?.rgb ?: 0xFF221C18.toInt()
     var card = base
     var darken = 0f
     while (ColorUtils.calculateLuminance(card) > CARD_MAX_LUMINANCE && darken < 1f) {
         darken += 0.1f
         card = ColorUtils.blendARGB(base, Color.BLACK, darken)
     }
-    val accent = (lightVibrantSwatch ?: vibrantSwatch ?: lightMutedSwatch)?.rgb ?: 0xFF3B82F6.toInt()
+    val accent = (lightVibrantSwatch ?: vibrantSwatch ?: lightMutedSwatch)?.rgb ?: 0xFFF43F18.toInt()
     return WidgetPalette(
         card = card,
         title = ColorUtils.blendARGB(Color.WHITE, accent, 0.12f),

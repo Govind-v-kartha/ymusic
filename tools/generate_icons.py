@@ -199,7 +199,7 @@ def main():
     print(f"Extracted {len(valid_contours)} vector paths for drawables.")
 
     # Generate Android Vector XML string
-    def build_vector_xml(width_dp, height_dp, vp_w, vp_h, paths_data, fill_color="#002892", group_transform=None):
+    def build_vector_xml(width_dp, height_dp, vp_w, vp_h, paths_data, fill_color="#F43F18", group_transform=None):
         xml_lines = [
             '<?xml version="1.0" encoding="utf-8"?>',
             f'<vector xmlns:android="http://schemas.android.com/apk/res/android"',
@@ -261,7 +261,7 @@ def main():
     splash_ty = (splash_vp - (bbox_h * splash_scale)) / 2.0
     splash_xml = build_vector_xml(
         width_dp=160, height_dp=160, vp_w=splash_vp, vp_h=splash_vp,
-        paths_data=svg_paths, fill_color="#002892",
+        paths_data=svg_paths, fill_color="#F43F18",
         group_transform={"tx": splash_tx, "ty": splash_ty, "sx": splash_scale, "sy": splash_scale}
     )
     with open(os.path.join(drawable_dir, "splash_icon.xml"), "w", encoding="utf-8") as f:
@@ -288,7 +288,7 @@ def main():
     logo_ty = (logo_vp - (bbox_h * logo_scale)) / 2.0
     logo_xml = build_vector_xml(
         width_dp=192, height_dp=192, vp_w=logo_vp, vp_h=logo_vp,
-        paths_data=svg_paths, fill_color="#002892",
+        paths_data=svg_paths, fill_color="#F43F18",
         group_transform={"tx": logo_tx, "ty": logo_ty, "sx": logo_scale, "sy": logo_scale}
     )
     common_drawable_dir = os.path.join("commonUi", "src", "commonMain", "composeResources", "drawable")
@@ -319,7 +319,7 @@ def main():
   <g transform="translate({logo_tx:.1f}, {logo_ty:.1f}) scale({logo_scale:.4f})">
 """)
         for p in svg_paths:
-            f.write(f'    <path fill="#002892" d="{p}"/>\n')
+            f.write(f'    <path fill="#F43F18" d="{p}"/>\n')
         f.write("  </g>\n</svg>\n")
 
     # 9. Desktop assets: ymusic.png, ymusic.ico, ymusic.icns

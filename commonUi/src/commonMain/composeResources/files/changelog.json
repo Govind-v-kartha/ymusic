@@ -1,13 +1,15 @@
 [
   {
     "id": 4,
-    "version": "Updater",
+    "version": "Updater and orange theme",
     "date": "2026-11-03",
     "notes": [
       "Direct in-app update check querying personal GitHub releases",
       "In-app APK download with size cap and SHA-256 verification",
       "Cryptographic APK package and signing certificate verification before install",
-      "Check for updates action in Settings with current version display"
+      "Check for updates action in Settings with current version display",
+      "New custom coral orange logo with high contrast in light and dark themes",
+      "Warm neutral surface palette with vibrant coral accents"
     ]
   },
   {
