@@ -182,7 +182,6 @@ enum class AppSection(val id: Int, val label: StringResource, val icon: ImageVec
     Downloads(5, Res.string.section_downloads, Icons.Outlined.FileDownload, 1),
     Settings(6, Res.string.section_settings, Icons.Outlined.Settings, 1),
     Catalogue(7, Res.string.section_catalogue, Icons.Outlined.Palette, 1),
-    Donate(8, Res.string.section_donate, Icons.Outlined.FavoriteBorder, 2),
     Telegram(9, Res.string.section_telegram, TelegramIcon, 2),
     Feedback(10, Res.string.section_feedback, Icons.AutoMirrored.Outlined.Chat, 2),
 }
@@ -982,16 +981,14 @@ private fun AppRoot(
                                 guest = graph.guest,
                                 showCatalogue = catalogue != null,
                                 onSelect = { s ->
-                                    // Donate and Telegram are actions, not screens.
+                                    // Telegram is an action, not a screen.
                                     when (s) {
-                                        AppSection.Donate -> graph.openDonation?.invoke()
                                         AppSection.Telegram -> uriHandler.openUri(AppLinks(config).telegram)
                                         else -> openSection(s)
                                     }
                                     scope.launch { drawer.close() }
                                 },
                                 premium = premium,
-                                showDonate = graph.openDonation != null,
                                 websiteUrl = AppLinks(config).website,
                                 updates = graph.updates,
                                 onCheckUpdate = graph.updates?.let {

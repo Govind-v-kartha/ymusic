@@ -66,8 +66,6 @@ fun AppDrawer(
     onCheckUpdate: (() -> Unit)? = null,
     /** Shows the PREMIUM badge. */
     premium: Boolean = false,
-    /** Lists Donate (only where a donation screen exists). */
-    showDonate: Boolean = false,
     websiteUrl: String = AppLinks(null).website,
     /** Whether the drawer is open: each opening lands keyboard focus on the current section's item. */
     open: Boolean = false,
@@ -85,7 +83,6 @@ fun AppDrawer(
             val listed = AppSection.entries
                 .filter { it != AppSection.Catalogue || showCatalogue }
                 .filter { it != AppSection.PlayAgain || !guest }
-                .filter { it != AppSection.Donate || showDonate }
             // Keyed on open: Material3's drawer keeps its content composed while closed.
             val activeItemFocus = remember { FocusRequester() }
             LaunchedEffect(open) {

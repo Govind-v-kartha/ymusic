@@ -686,11 +686,7 @@ class YMusicApplication : Application() {
             stats = shared.stats,
             updates = shared.updates,
             premium = premium,
-            openDonation = {
-                resumedActivity?.get()?.let { activity ->
-                    SupportApp.openDonation(activity, shared.remoteConfig.config.value.features.donationUrl, rootLogger)
-                }
-            },
+            openDonation = null,
             shareText = { text ->
                 startShare(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text))
             },
