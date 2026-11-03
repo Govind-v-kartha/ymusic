@@ -97,6 +97,24 @@ jobs:
         working-directory: YMusicV4
         run: rm -rf signing
 
+      - name: Generate update.json
+        working-directory: YMusicV4
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="v-manual-${{ github.run_number }}"
+          fi
+          # Locate aapt2 in the Android build-tools
+          BUILD_TOOLS_DIR=$(ls -d "$ANDROID_HOME/build-tools/"* | sort -V | tail -n 1)
+          AAPT2_BIN="$BUILD_TOOLS_DIR/aapt2"
+          python3 tools/make_update_json.py \
+            --tag "$TAG_NAME" \
+            --apk androidApp/build/outputs/apk/release/YMusic-*-arm64-v8a-release.apk \
+            --changelog commonUi/src/commonMain/composeResources/files/changelog.json \
+            --aapt2 "$AAPT2_BIN" \
+            --output update.json
+          cat update.json
+
       - name: Create GitHub Release
         working-directory: YMusicV4
         env:
@@ -110,5 +128,6 @@ jobs:
           fi
           gh release create "$TAG_NAME" \
             androidApp/build/outputs/apk/release/*.apk \
+            update.json \
             --title "Personal Release $TAG_NAME" \
             --notes "Personal release build (arm64-v8a) with no-repeat + anti-spam feature."
