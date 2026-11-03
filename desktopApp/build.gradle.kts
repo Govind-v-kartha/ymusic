@@ -469,13 +469,81 @@ if (hostOs == "linux") {
             val root = File(temporaryDir, "deb").apply { deleteRecursively() }
             run("dpkg-deb", "-R", deb.path, root.path)
             val control = File(root, "DEBIAN/control")
-            val controlContent = control.readText().trimEnd()
-                .replace(Regex("(?m)^Maintainer:.*$"), "")
-            control.writeText(
-                controlContent +
-                    "\nMaintainer: Govind-v-kartha <https://t.me/SethuramaIyer_CBI>" +
-                    "\nHomepage: https://github.com/Govind-v-kartha/ymusic\n",
-            )
+            // Parse existing fields preserving order and handling multi-line continuation lines
+            val fieldList = mutableListOf<Pair<String, String>>()
+            var currentKey: String? = null
+            var currentValue = StringBuilder()
+
+            control.readText().lines().forEach { line ->
+                val trimmed = line.trimEnd('\r', '\n')
+                if (trimmed.isEmpty()) {
+                    // Blank lines delimit paragraphs in RFC 822 / Debian control.
+                    // DEBIAN/control must contain strictly one stanza; ignore any stray blank line.
+                    return@forEach
+                }
+                if (trimmed.startsWith(" ") || trimmed.startsWith("\t")) {
+                    if (currentKey != null) {
+                        currentValue.append("\n").append(trimmed)
+                    }
+                } else if (trimmed.contains(':')) {
+                    val colon = trimmed.indexOf(':')
+                    val key = trimmed.substring(0, colon).trim()
+                    val value = trimmed.substring(colon + 1).trim()
+                    if (currentKey != null) {
+                        fieldList.add(currentKey!! to currentValue.toString())
+                    }
+                    currentKey = key
+                    currentValue = StringBuilder(value)
+                }
+            }
+            if (currentKey != null) {
+                fieldList.add(currentKey!! to currentValue.toString())
+            }
+
+            // Update or insert Maintainer and Homepage
+            val maintainerValue = "Govind-v-kartha <https://t.me/SethuramaIyer_CBI>"
+            val homepageValue = "https://github.com/Govind-v-kartha/ymusic"
+
+            fun upsertField(targetKey: String, targetVal: String) {
+                val idx = fieldList.indexOfFirst { it.first.equals(targetKey, ignoreCase = true) }
+                if (idx >= 0) {
+                    fieldList[idx] = fieldList[idx].first to targetVal
+                } else {
+                    fieldList.add(targetKey to targetVal)
+                }
+            }
+
+            upsertField("Maintainer", maintainerValue)
+            upsertField("Homepage", homepageValue)
+
+            // Validate all required Debian fields are present and not empty
+            val requiredDebianFields = listOf("Package", "Version", "Architecture", "Maintainer", "Description")
+            for (req in requiredDebianFields) {
+                val found = fieldList.find { it.first.equals(req, ignoreCase = true) }
+                check(found != null && found.second.isNotBlank()) {
+                    "Missing or blank required Debian control field '$req' in ${control.path}"
+                }
+            }
+
+            // Reconstruct single-stanza control file
+            val newControlText = fieldList.joinToString("\n") { (k, v) ->
+                if (v.contains("\n")) {
+                    val subLines = v.split("\n")
+                    "$k: ${subLines.first()}\n" + subLines.drop(1).joinToString("\n")
+                } else {
+                    "$k: $v"
+                }
+            } + "\n"
+
+            // Strictly assert single stanza: no blank lines allowed inside stanza
+            check(!newControlText.contains("\n\n") && !newControlText.contains("\r\n\r\n")) {
+                "Control file contains multiple stanzas (blank lines detected):\n$newControlText"
+            }
+            control.writeText(newControlText)
+
+            println("=== Patched DEBIAN/control ===")
+            println(newControlText)
+            println("==============================")
             root.walk().filter { it.isFile && it.name.endsWith(".desktop") }.forEach {
                 val existing = it.readText()
                 val withCategory = if (!existing.contains("Categories=")) {

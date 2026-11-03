@@ -32,9 +32,26 @@ jobs:
         with:
           path: YMusicV4
 
-      - name: Cache ffmpeg windows-x86_64
+      - name: Setup MSYS2 and MinGW toolchain
+        id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          suppress-deprecation-warnings: 'msystem-mingw64'
+          update: true
+          install: >-
+            git make diffutils autoconf automake libtool patch
+            mingw-w64-x86_64-toolchain mingw-w64-x86_64-make
+            mingw-w64-x86_64-nasm mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-meson mingw-w64-x86_64-ninja mingw-w64-x86_64-zlib
+
+      - name: Locate MinGW
+        shell: bash
+        run: echo "MINGW_HOME=$(cygpath -m '${{ steps.msys2.outputs.msys2-location }}')/mingw64" >> "$GITHUB_ENV"
+
+      - name: Restore ffmpeg windows-x86_64 cache
         id: cache-ffmpeg
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ffmpeg-build/out/windows-x86_64
           key: desktop-ffmpeg-windows-x86_64-${{ env.FFMPEG_BUILD_REF }}
@@ -49,18 +66,8 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
-      - name: Setup MSYS2 for building ffmpeg
-        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          update: true
-          install: >-
-            git make diffutils autoconf automake libtool patch
-            mingw-w64-x86_64-toolchain mingw-w64-x86_64-nasm mingw-w64-x86_64-pkgconf
-            mingw-w64-x86_64-meson mingw-w64-x86_64-ninja mingw-w64-x86_64-zlib
-
       - name: Build ffmpeg windows-x86_64
+        id: build-ffmpeg
         if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
         shell: msys2 {0}
         working-directory: ffmpeg-build
@@ -74,16 +81,12 @@ jobs:
             exit 1
           }
 
-      - name: Setup MSYS2 MinGW toolchain for :quickjs and :mse
-        id: msys2
-        uses: msys2/setup-msys2@v2
+      - name: Save ffmpeg windows-x86_64 cache
+        if: always() && steps.build-ffmpeg.outcome == 'success'
+        uses: actions/cache/save@v4
         with:
-          msystem: MINGW64
-          install: mingw-w64-x86_64-toolchain
-
-      - name: Locate MinGW
-        shell: bash
-        run: echo "MINGW_HOME=$(cygpath -m '${{ steps.msys2.outputs.msys2-location }}')/mingw64" >> "$GITHUB_ENV"
+          path: ffmpeg-build/out/windows-x86_64
+          key: desktop-ffmpeg-windows-x86_64-${{ env.FFMPEG_BUILD_REF }}
 
       - name: Install Inno Setup
         shell: bash
@@ -173,9 +176,9 @@ jobs:
         with:
           path: YMusicV4
 
-      - name: Cache ffmpeg linux-x86_64
+      - name: Restore ffmpeg linux-x86_64 cache
         id: cache-ffmpeg
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ffmpeg-build/out/linux-x86_64
           key: desktop-ffmpeg-linux-x86_64-${{ env.FFMPEG_BUILD_REF }}-ubuntu22
@@ -191,6 +194,7 @@ jobs:
           fetch-depth: 1
 
       - name: Build ffmpeg linux-x86_64
+        id: build-ffmpeg
         if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
         working-directory: ffmpeg-build
         run: |
@@ -201,6 +205,13 @@ jobs:
             done
             exit 1
           }
+
+      - name: Save ffmpeg linux-x86_64 cache
+        if: always() && steps.build-ffmpeg.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: ffmpeg-build/out/linux-x86_64
+          key: desktop-ffmpeg-linux-x86_64-${{ env.FFMPEG_BUILD_REF }}-ubuntu22
 
       - name: Install Linux build dependencies
         run: sudo apt-get update && sudo apt-get install -y libpulse-dev fakeroot build-essential
@@ -260,6 +271,10 @@ jobs:
           DEB="artifacts/YMusic-${TAG}-linux-x64.deb"
           echo "=== dpkg-deb --info ==="
           dpkg-deb --info "$DEB"
+          echo "=== DEBIAN/control exact bytes (cat -A) ==="
+          mkdir -p /tmp/deb-control
+          dpkg-deb -e "$DEB" /tmp/deb-control
+          cat -A /tmp/deb-control/control
           echo "=== dpkg-deb --contents ==="
           dpkg-deb --contents "$DEB"
           echo "=== Install and Smoke Test ==="
@@ -342,3 +357,4 @@ jobs:
             echo "Trigger is not a v*-personal.* tag ($GITHUB_REF): skipping release upload."
             echo "Desktop binaries are available in workflow artifacts."
           fi
+
