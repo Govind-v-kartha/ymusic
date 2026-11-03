@@ -157,7 +157,9 @@ private fun DrawerHeader(appVersion: String?, premium: Boolean, onCheckUpdate: (
                     }
                 }
             }
-            HeaderLink("ymusic.io") { uriHandler.openUri(websiteUrl) }
+            if (websiteUrl.isNotBlank()) {
+                HeaderLink("GitHub") { uriHandler.openUri(websiteUrl) }
+            }
         }
     }
 }

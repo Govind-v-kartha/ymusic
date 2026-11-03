@@ -23,7 +23,10 @@ internal class FeedbackInfo(
 
     val text: String get() = "```\n$lines\n```"
 
-    fun githubIssueUrl(): String = "$issueUrl${if ('?' in issueUrl) '&' else '?'}body=${percentEncode(prefill(text))}"
+    fun githubIssueUrl(): String {
+        if (issueUrl.startsWith("https://t.me/")) return issueUrl
+        return "$issueUrl${if ('?' in issueUrl) '&' else '?'}body=${percentEncode(prefill(text))}"
+    }
 
     fun mailtoUrl(subject: String): String =
         "mailto:$email?subject=${percentEncode(subject)}&body=${percentEncode(prefill(lines))}"

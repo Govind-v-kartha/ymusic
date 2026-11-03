@@ -204,16 +204,18 @@ internal fun FeedbackScreen(graph: AppGraph, onDismiss: () -> Unit) {
                         uriHandler.openUri(currentInfo.githubIssueUrl())
                     },
                 )
-                val subject = stringResource(Res.string.feedback_email_subject)
-                ContactRow(
-                    icon = Icons.Outlined.Email,
-                    title = stringResource(Res.string.feedback_email_title, links.feedbackEmail),
-                    hint = stringResource(Res.string.feedback_email_hint),
-                    onClick = {
-                        sendLogs()
-                        uriHandler.openUri(currentInfo.mailtoUrl(subject))
-                    },
-                )
+                if (links.feedbackEmail.isNotBlank()) {
+                    val subject = stringResource(Res.string.feedback_email_subject)
+                    ContactRow(
+                        icon = Icons.Outlined.Email,
+                        title = stringResource(Res.string.feedback_email_title, links.feedbackEmail),
+                        hint = stringResource(Res.string.feedback_email_hint),
+                        onClick = {
+                            sendLogs()
+                            uriHandler.openUri(currentInfo.mailtoUrl(subject))
+                        },
+                    )
+                }
                 val sendMessage = graph.sendFeedbackMessage
                 if (sendMessage != null && capture != null) {
                     var writing by remember { mutableStateOf(false) }
