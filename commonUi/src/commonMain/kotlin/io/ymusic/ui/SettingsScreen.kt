@@ -230,7 +230,9 @@ fun SettingsScreen(graph: AppGraph, signedIn: Boolean = false, onLogin: () -> Un
             ChangelogRow()
             val config by remember(graph) { graph.remoteConfig ?: emptyFlow() }.collectAsState(initial = null)
             val links = AppLinks(config)
-            LinkRow(Res.string.settings_terms, links.terms)
+            if (links.terms.isNotBlank()) {
+                LinkRow(Res.string.settings_terms, links.terms)
+            }
         }
         SettingsSection(Res.string.settings_debug) {
             ToggleRow(graph, AppSettings.showFps, Res.string.settings_show_fps, Res.string.settings_show_fps_hint)

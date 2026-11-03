@@ -9,6 +9,6 @@ internal class AppLinks(config: RemoteConfigData?) {
     val feedbackEmail: String = ""
     val feedbackIssue: String = "https://t.me/SethuramaIyer_CBI"
     val sourceCode: String = "https://github.com/Govind-v-kartha/ymusic"
-    val terms: String = "https://github.com/Govind-v-kartha/ymusic/blob/master/TERMS.md"
+    val terms: String = ""
     val changelog: String = "https://github.com/Govind-v-kartha/ymusic/releases"
 }
