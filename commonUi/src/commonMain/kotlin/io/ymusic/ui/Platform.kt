@@ -11,6 +11,9 @@ internal expect val platformUsesTouch: Boolean
 /** Desktop Compose UI uses a transparent window with a layout hole over a video-only Frame. */
 internal expect val desktopLayoutHole: Boolean
 
+/** True on desktop platforms (Windows, macOS, Linux JVM). */
+internal fun isDesktopPlatform(): Boolean = !platformUsesTouch
+
 /** The system back gesture/button (Android's BackHandler): while [enabled], [onBack] intercepts
  *  it instead of finishing the app. No-op on platforms without a system back concept. */
 @Composable

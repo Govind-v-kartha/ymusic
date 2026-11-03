@@ -174,6 +174,12 @@ object AppSettings {
     /** Keep mood toggle (enabled by default; preserves calm/energetic flow). */
     val keepMood = BoolSetting("playback.keepMood", true)
 
+    /** Auto-resume last playback queue on launch (default true on mobile). */
+    val resumeOnLaunch = BoolSetting("playback.resumeOnLaunch", true)
+
+    /** Launch app at system startup (desktop only). */
+    val launchAtLogin = BoolSetting("app.launchAtLogin", false)
+
     /** The sleep-timer dialog's last chosen duration, its starting value next time. */
     val sleepTimerMinutes = IntSetting("playback.sleepTimerMinutes", 30)
 

@@ -52,6 +52,8 @@ internal class IosSettingsStore(
             AppSettings.songMix.key,
             AppSettings.keepMood.key,
             AppSettings.lastSeenChangelogId.key,
+            AppSettings.resumeOnLaunch.key,
+            AppSettings.launchAtLogin.key,
         )
     }
 }

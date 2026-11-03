@@ -1,5 +1,19 @@
 [
   {
+    "id": 6,
+    "version": "Desktop overhaul & system integration",
+    "date": "2026-11-04",
+    "notes": [
+      "Windows SMTC media session and Linux MPRIS D-Bus controls with live seek bar",
+      "Global OS media hotkeys and window show/hide toggle when minimized",
+      "Dedicated desktop UI with 72dp navigation rail and persistent Now Playing panel",
+      "Compact 48dp track rows and drag-and-drop local audio file playback",
+      "Windows taskbar download progress bar and desktop completion notifications",
+      "Audio file associations for Windows installer and Linux Debian package",
+      "Settings toggle for resume playback on launch (default off on desktop)"
+    ]
+  },
+  {
     "id": 5,
     "version": "Language and mood autoplay mix",
     "date": "2026-11-03",

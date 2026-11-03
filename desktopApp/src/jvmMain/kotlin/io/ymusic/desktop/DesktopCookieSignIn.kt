@@ -225,7 +225,11 @@ fun DesktopCookieSignIn(
                             singleLine = false,
                             isError = pasteError != null,
                             supportingText = pasteError,
-                            modifier = Modifier.height(120.dp),
+                            modifier = Modifier
+                                .height(120.dp)
+                                .background(DesignColors.SurfaceDim, RoundedCornerShape(8.dp))
+                                .border(1.dp, DesignColors.OutlineSoft, RoundedCornerShape(8.dp))
+                                .padding(horizontal = 4.dp),
                         )
                         AccentButton(
                             text = stringResource(Res.string.signin_paste_submit),
@@ -401,7 +405,7 @@ internal fun AccentButton(text: String, enabled: Boolean, onClick: () -> Unit) {
     ) {
         Text(
             text.uppercase(),
-            style = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Bold, color = DesignColors.OnInk),
+            style = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Bold, color = DesignColors.OnAccent),
         )
     }
 }

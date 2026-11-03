@@ -319,11 +319,27 @@ fun main(args: Array<String>) {
     if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.APP_EVENT_REOPENED)) {
         Desktop.getDesktop().addAppEventListener(AppReopenedListener { showWindowRequests.tryEmit(Unit) })
     }
+    if (args.isNotEmpty()) {
+        val argFile = java.io.File(args[0])
+        if (argFile.exists() && argFile.isFile) {
+            IncomingLinks.open(argFile.toURI().toString())
+        }
+    }
+    if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.APP_OPEN_FILE)) {
+        Desktop.getDesktop().setOpenFileHandler { event ->
+            event.files?.firstOrNull()?.let { file ->
+                IncomingLinks.open(file.toURI().toString())
+                showWindowRequests.tryEmit(Unit)
+            }
+        }
+    }
     // Opened before anything else: crash-reporting consent lives here.
     val appStore = AppStore.open(ymusicDataDir(), rootLogger.fork("app-store"))
     val settings = kotlinx.coroutines.runBlocking {
         AppStoreSettings.open(appStore).also {
-            // First launch decides the app language (device if supported, else English) and persists it.
+            if (appStore.settings()[AppSettings.resumeOnLaunch.key] == null) {
+                it.put(AppSettings.resumeOnLaunch, false)
+            }
             ensureAppLanguage(it)
         }
     }
@@ -449,6 +465,20 @@ fun main(args: Array<String>) {
                 io.ymusic.ui.GlobalShortcutActions.showMessage(getString(Res.string.sound_volume, (volume * 100).roundToInt()))
             }
         }
+        val currentTrack = graph?.player?.queue?.collectAsState()?.value?.currentItem
+        val currentTitle = currentTrack?.displayTitle.orEmpty()
+        val currentArtist = currentTrack?.displaySubtitle?.takeIf { it.isNotBlank() }
+        val windowTitle = if (currentTrack != null) {
+            if (currentArtist != null) "$currentArtist — $currentTitle · YMusic" else "$currentTitle · YMusic"
+        } else {
+            "YMusic"
+        }
+        val trayTooltip = if (currentTrack != null) {
+            val full = if (currentArtist != null) "$currentArtist — $currentTitle" else currentTitle
+            full.take(127)
+        } else {
+            "YMusic"
+        }
         Window(
             // Held back until the graph is ready: an empty window that then repaints is a flash of
             // whatever the toolkit felt like showing. Composed all along, so paintWindowGround has
@@ -459,7 +489,7 @@ fun main(args: Array<String>) {
                 // carries on; an empty queue → quit.
                 if (graph?.player?.queue?.value?.items?.isNotEmpty() == true) windowVisible = false else quit()
             },
-            title = "YMusic",
+            title = windowTitle,
             icon = null,
             state = windowState,
             undecorated = true,
@@ -475,6 +505,81 @@ fun main(args: Array<String>) {
             onKeyEvent = { event -> handleArrowShortcut(event, graph?.player, showVolume) },
         ) {
             paintWindowGround(Color.Transparent)
+            LaunchedEffect(window) {
+                window.contentPane.background = java.awt.Color(0x1B, 0x1B, 0x1B)
+            }
+            DisposableEffect(window) {
+                val dropTarget = object : java.awt.dnd.DropTarget() {
+                    @Suppress("UNCHECKED_CAST")
+                    override fun drop(dtde: java.awt.dnd.DropTargetDropEvent) {
+                        try {
+                            dtde.acceptDrop(java.awt.dnd.DnDConstants.ACTION_COPY)
+                            val transferable = dtde.transferable
+                            if (transferable.isDataFlavorSupported(java.awt.datatransfer.DataFlavor.javaFileListFlavor)) {
+                                val files = transferable.getTransferData(java.awt.datatransfer.DataFlavor.javaFileListFlavor) as List<java.io.File>
+                                val audioExts = setOf("mp3", "m4a", "flac", "opus", "ogg", "wav", "mp4", "webm")
+                                files.firstOrNull { it.isFile && it.extension.lowercase() in audioExts }?.let { file ->
+                                    IncomingLinks.open(file.toURI().toString())
+                                }
+                            }
+                            dtde.dropComplete(true)
+                        } catch (_: Throwable) {
+                            dtde.dropComplete(false)
+                        }
+                    }
+                }
+                window.dropTarget = dropTarget
+                onDispose { window.dropTarget = null }
+            }
+            val currentG = graph
+            val dlService = currentG?.downloads
+            if (dlService != null) {
+                val dlAggregator = remember(dlService) { io.ymusic.download.DownloadTasksAggregator(dlService::snapshot, dlService.changes) }
+                val dlTasks by dlAggregator.tasks.collectAsState(emptyList())
+                val activeDownloads = dlTasks.filter { it.state == io.ymusic.download.DownloadState.DOWNLOADING }
+                LaunchedEffect(activeDownloads, window) {
+                    if (java.awt.Taskbar.isTaskbarSupported() && java.awt.Taskbar.getTaskbar().isSupported(java.awt.Taskbar.Feature.PROGRESS_VALUE)) {
+                        val tb = java.awt.Taskbar.getTaskbar()
+                        if (activeDownloads.isNotEmpty()) {
+                            val total = activeDownloads.sumOf { it.totalBytes.takeIf { t -> t > 0L } ?: it.downloadedBytes.coerceAtLeast(1L) }
+                            val downloaded = activeDownloads.sumOf { it.downloadedBytes }
+                            val percent = ((downloaded * 100) / total.coerceAtLeast(1L)).toInt().coerceIn(0, 100)
+                            try {
+                                tb.setWindowProgressState(window, java.awt.Taskbar.State.NORMAL)
+                                tb.setWindowProgressValue(window, percent)
+                            } catch (_: Throwable) {}
+                        } else {
+                            try {
+                                tb.setWindowProgressState(window, java.awt.Taskbar.State.OFF)
+                            } catch (_: Throwable) {}
+                        }
+                    }
+                }
+            }
+            val mediaKeysScope = rememberCoroutineScope()
+            val mediaKeys = remember(currentG) {
+                currentG?.let { g ->
+                    GlobalMediaKeys(
+                        playerProvider = { g.player },
+                        onToggleWindow = { windowVisible = !windowVisible },
+                        scope = mediaKeysScope,
+                        log = rootLogger.fork("global-media-keys"),
+                    )
+                }
+            }
+            DisposableEffect(mediaKeys) {
+                onDispose { mediaKeys?.release() }
+            }
+            LaunchedEffect(settings) {
+                settings.flow(AppSettings.launchAtLogin).collect { enabled ->
+                    DesktopLaunchAtLogin.setEnabled(enabled)
+                }
+            }
+            LaunchedEffect(currentG) {
+                if (currentG != null && !settings.flow(AppSettings.resumeOnLaunch).value) {
+                    currentG.player.clearQueue()
+                }
+            }
             // Not Window(icon=): that is one 32dp raster the OS nearest-scales into each of its
             // icon slots (Windows: 16/20/24/32/40/48/64/256 px by DPI). One exact raster per slot.
             // macOS ignores window icons (the Dock tile is set above).
@@ -735,6 +840,7 @@ fun main(args: Array<String>) {
                 painterResource(Res.drawable.ymusic_logo),
                 rootLogger.fork("tray"),
                 menu = playerMenu.takeUnless { isMac },
+                tooltip = trayTooltip,
             ) { point ->
                 miniAnchor = point
                 miniOpen = !miniOpen
@@ -1030,7 +1136,20 @@ private suspend fun buildGraph(settings: AppStoreSettings, session: CookieSessio
             // The user's chosen download location — always set: the download flow requires picking one
             // before enqueue.
             downloadFolder = { settings.downloadLocationFolder()!! },
-            onCompleted = { task, result -> registerCompletedDownload(mediaStore, settings, downloadScanner, task, result) },
+            onCompleted = { task, result ->
+                registerCompletedDownload(mediaStore, settings, downloadScanner, task, result)
+                if (java.awt.SystemTray.isSupported() && java.awt.SystemTray.getSystemTray().trayIcons.isNotEmpty()) {
+                    java.awt.SystemTray.getSystemTray().trayIcons.firstOrNull()?.displayMessage(
+                        "YMusic",
+                        "Downloaded: ${task.title}",
+                        java.awt.TrayIcon.MessageType.INFO,
+                    )
+                } else if (System.getProperty("os.name").lowercase().contains("linux")) {
+                    try {
+                        ProcessBuilder("notify-send", "YMusic", "Downloaded: ${task.title}").start()
+                    } catch (_: Throwable) {}
+                }
+            },
             logger = rootLogger,
             playerResponse = resolver::playerResponse,
         )

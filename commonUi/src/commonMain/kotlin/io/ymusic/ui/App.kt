@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -958,47 +959,20 @@ private fun AppRoot(
                 Modifier.fillMaxSize().safeDrawingPadding(),
             ) {
                 // design/final/home.html: landscape (or any window this wide) puts the tab row inline in the app bar.
+                val isDesktop = isDesktopPlatform()
                 val wide = maxWidth > maxHeight && maxWidth >= 600.dp || maxWidth >= 650.dp
                 // Fully covering Now Playing is opaque: skip drawing the feed/mini-player under it
                 // (4× GPU overdraw). Draw them again as soon as the sheet peeks so dismiss reveals.
-                val drawShell = !nowPlayingOpen || nowPlayingPeeking
+                val drawShell = !nowPlayingOpen || nowPlayingPeeking || isDesktop
                 Box(
                     Modifier.fillMaxSize()
                         .drawWithContent { if (drawShell) drawContent() }
                         // Not with the hole open (the box is empty then): desktop's a11y point
                         // hit-test returns the first child containing the point, so even an empty
                         // cleared node here would shadow Now Playing.
-                        .then(if (nowPlayingOpen && !holeOpen) Modifier.clearAndSetSemantics {} else Modifier),
+                        .then(if (nowPlayingOpen && !holeOpen && !isDesktop) Modifier.clearAndSetSemantics {} else Modifier),
                 ) {
-                    if (!holeOpen) AppNavigationDrawer(
-                        drawerState = drawer,
-                        drawerContent = {
-                            AppDrawer(
-                                section = section,
-                                appVersion = graph.appVersion,
-                                guest = graph.guest,
-                                showCatalogue = catalogue != null,
-                                onSelect = { s ->
-                                    // Telegram is an action, not a screen.
-                                    when (s) {
-                                        AppSection.Telegram -> uriHandler.openUri(AppLinks(config).telegram)
-                                        else -> openSection(s)
-                                    }
-                                    scope.launch { drawer.close() }
-                                },
-                                premium = premium,
-                                websiteUrl = AppLinks(config).website,
-                                updates = graph.updates,
-                                onCheckUpdate = graph.updates?.let {
-                                    {
-                                        checkingUpdate = true
-                                        scope.launch { drawer.close() }
-                                    }
-                                },
-                                open = drawer.isOpen,
-                            )
-                        },
-                    ) {
+                    val shellContent = @Composable {
                         // The shell owns app-bar elevation: content reports its scroll via TrackScroll into
                         // this host, and the bar reads it. (Content never touches the bar directly.)
                         val scrollHost = remember { ScrollHost() }
@@ -1250,7 +1224,7 @@ private fun AppRoot(
                                         mini(Modifier.fillMaxWidth())
                                     }
                                 } else {
-                                    val miniVisible = coordinator.player.queue.collectAsState().value.currentItem != null
+                                    val miniVisible = (!isDesktop || !nowPlayingOpen) && coordinator.player.queue.collectAsState().value.currentItem != null
                                     val miniInset = if (miniVisible) with(LocalDensity.current) { miniHeightPx.toDp() } else 0.dp
                                     Box(Modifier.fillMaxSize()) {
                                         Column(Modifier.fillMaxSize().padding(padding)) {
@@ -1264,6 +1238,60 @@ private fun AppRoot(
                                     }
                                 }
                             }
+                        }
+                    }
+
+                    if (isDesktop) {
+                        Row(Modifier.fillMaxSize()) {
+                            DesktopNavRail(
+                                currentSection = section,
+                                onSelectSection = { openSection(it) },
+                            )
+                            Box(Modifier.weight(1f).fillMaxHeight()) {
+                                shellContent()
+                            }
+                            if (nowPlayingOpen) {
+                                DesktopNowPlayingSidePanel(
+                                    graph = graph,
+                                    coordinator = coordinator,
+                                    onClose = {
+                                        graph.pip.nowPlayingOpen.value = false
+                                        nowPlayingPeeking = false
+                                    },
+                                )
+                            }
+                        }
+                    } else {
+                        if (!holeOpen) AppNavigationDrawer(
+                            drawerState = drawer,
+                            drawerContent = {
+                                AppDrawer(
+                                    section = section,
+                                    appVersion = graph.appVersion,
+                                    guest = graph.guest,
+                                    showCatalogue = catalogue != null,
+                                    onSelect = { s ->
+                                        // Telegram is an action, not a screen.
+                                        when (s) {
+                                            AppSection.Telegram -> uriHandler.openUri(AppLinks(config).telegram)
+                                            else -> openSection(s)
+                                        }
+                                        scope.launch { drawer.close() }
+                                    },
+                                    premium = premium,
+                                    websiteUrl = AppLinks(config).website,
+                                    updates = graph.updates,
+                                    onCheckUpdate = graph.updates?.let {
+                                        {
+                                            checkingUpdate = true
+                                            scope.launch { drawer.close() }
+                                        }
+                                    },
+                                    open = drawer.isOpen,
+                                )
+                            },
+                        ) {
+                            shellContent()
                         }
                     }
                 }
@@ -1286,7 +1314,7 @@ private fun AppRoot(
                 LocalSignInResolver provides signInResolver,
                 *songActions.provided(),
             ) {
-                if (nowPlayingOpen) {
+                if (nowPlayingOpen && !isDesktopPlatform()) {
                     NowPlayingScreen(
                         graph,
                         coordinator,
@@ -1572,6 +1600,7 @@ private fun DiscoverFeed(
                         Box(
                             Modifier
                                 .fillMaxWidth()
+                                
                                 .padding(horizontal = DesignSpacing.MarginCompact, vertical = DesignSpacing.Space8),
                         ) {
                             NoRepeatChip(graph)

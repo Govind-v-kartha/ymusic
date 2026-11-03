@@ -30,7 +30,7 @@ compose.resources {
 val desktopVersion = System.getenv("YMUSIC_DESKTOP_VERSION")?.takeIf { it.isNotBlank() } ?: appVersionName()
 // BUMP ON EVERY RELEASE. The update check compares this and nothing else — desktopVersion is a
 // display string. Desktop counts separately from androidApp's versionCode (separate cadence).
-val desktopVersionCode = System.getenv("YMUSIC_DESKTOP_VERSION_CODE")?.toIntOrNull() ?: 18
+val desktopVersionCode = System.getenv("YMUSIC_DESKTOP_VERSION_CODE")?.toIntOrNull() ?: 19
 version = desktopVersion
 
 /** The first candidate JDK that carries jpackage — the marker for "full JDK, not a JBR/JRE". */
@@ -551,7 +551,7 @@ if (hostOs == "linux") {
                 val withCategory = if (!existing.contains("Categories=")) {
                     existing.trimEnd() + "\nCategories=AudioVideo;Audio;Player;\n"
                 } else existing
-                it.writeText(withCategory.trimEnd() + "\nStartupWMClass=io-ymusic-desktop-MainKt\n")
+                it.writeText(withCategory.trimEnd() + "\nStartupWMClass=io-ymusic-desktop-MainKt\nMimeType=audio/mpeg;audio/mp4;audio/flac;audio/ogg;video/mp4;audio/x-matroska;audio/webm;\n")
             }
             run("dpkg-deb", "--root-owner-group", "--build", root.path, deb.path)
             root.deleteRecursively()
