@@ -1,5 +1,17 @@
 [
   {
+    "id": 2,
+    "version": "Rebrand",
+    "date": "2026-11-03",
+    "notes": [
+      "New custom royal blue app icon with matching splash and platform assets",
+      "Telegram contact updated to personal channel and support link",
+      "Donation options and source code links removed from navigation drawer and settings",
+      "In-app updater replaced with direct link to GitHub releases page",
+      "Changelog dialog showing what is new after app updates and in settings"
+    ]
+  },
+  {
     "id": 1,
     "version": "v4.0.0-personal.1",
     "date": "2026-11-03",
