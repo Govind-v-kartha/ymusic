@@ -344,11 +344,16 @@ class AndroidAppUpdates(
                 sink.flush()
                 session.fsync(out)
             }
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
             val callback = PendingIntent.getBroadcast(
                 context,
                 sessionId,
                 Intent(context, UpdateInstallReceiver::class.java),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+                flags,
             )
             session.commit(callback.intentSender)
         }

@@ -12,6 +12,7 @@ import kmpcommon.log.Logger
 import kmphttp.KmpHttpClient
 import kmphttp.RequestBuilder
 import kmphttp.asyncSource
+import kmphttp.toHttpUrlOrNull
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -350,11 +351,11 @@ internal suspend fun downloadApkSafely(
     val maxHops = 5
 
     while (hops < maxHops) {
-        val parsedUri = kmpcommon.uri.Uri.parse(currentUrl)
+        val parsedUri = currentUrl.toHttpUrlOrNull() ?: throw IllegalArgumentException("Malformed APK URL: $currentUrl")
         if (parsedUri.scheme != "https") {
             throw SecurityException("Insecure non-https download rejected: $currentUrl")
         }
-        val host = parsedUri.host ?: throw IllegalArgumentException("Missing host in APK URL")
+        val host = parsedUri.host
         if (!GitHubUpdateLogic.isAllowedHost(host)) {
             throw SecurityException("Disallowed download host: $host")
         }
@@ -369,7 +370,8 @@ internal suspend fun downloadApkSafely(
         try {
             if (resp.code in 300..399) {
                 val location = resp.header("Location") ?: throw IllegalStateException("Redirect without Location header")
-                currentUrl = if (location.startsWith("http")) location else "https://$host$location"
+                val redirectUri = parsedUri.resolve(location) ?: throw IllegalStateException("Malformed redirect Location: $location")
+                currentUrl = redirectUri.toString()
                 hops++
                 continue
             }

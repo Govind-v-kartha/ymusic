@@ -10,6 +10,7 @@ internal object SupportApp {
     const val PACKAGE = "com.kdev.ymusic.support"
 
     fun installed(context: Context): Boolean = try {
+        @Suppress("DEPRECATION")
         context.packageManager.getPackageInfo(PACKAGE, 0)
         true
     } catch (_: PackageManager.NameNotFoundException) {

@@ -92,14 +92,16 @@ object ApkSignatureVerifier {
         val pm = context.packageManager
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                @Suppress("DEPRECATION")
                 val info = pm.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES)
                 val signingInfo = info.signingInfo ?: return emptySet()
+                @Suppress("DEPRECATION")
                 val signatures = if (signingInfo.hasMultipleSigners()) {
                     signingInfo.apkContentsSigners
                 } else {
                     signingInfo.signingCertificateHistory
                 }
-                signatures.map { sha256Of(it.toByteArray()) }.toSet()
+                signatures?.map { sha256Of(it.toByteArray()) }?.toSet().orEmpty()
             } else {
                 @Suppress("DEPRECATION")
                 val info = pm.getPackageInfo(packageName, PackageManager.GET_SIGNATURES)
@@ -121,7 +123,7 @@ object ApkSignatureVerifier {
             } else {
                 signingInfo.signingCertificateHistory
             }
-            signatures.map { sha256Of(it.toByteArray()) }.toSet()
+            signatures?.map { sha256Of(it.toByteArray()) }?.toSet().orEmpty()
         } else {
             @Suppress("DEPRECATION")
             val signatures: Array<Signature>? = archiveInfo.signatures
