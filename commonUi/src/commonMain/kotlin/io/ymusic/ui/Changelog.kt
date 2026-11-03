@@ -56,7 +56,7 @@ object ChangelogStore {
     "date": "2026-11-03",
     "notes": [
       "New royal blue design palette with high contrast light and dark themes",
-      "Full WCAG 2.1 AA compliant contrast across text, cards, controls and surfaces",
+      "Clearer text contrast in light and dark themes",
       "Drawer brand badge and player widget colors aligned with royal blue theme",
       "System splash and window backgrounds matched to palette surfaces"
     ]
