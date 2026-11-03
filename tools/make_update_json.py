@@ -161,7 +161,7 @@ def build_update_json(
 def main():
     parser = argparse.ArgumentParser(description="Generate update.json for GitHub Releases")
     parser.add_argument("--tag", required=True, help="Release git tag (e.g. v4.0.0-personal.8)")
-    parser.add_argument("--apk", action="append", dest="apks", required=True, help="Path to APK file(s)")
+    parser.add_argument("--apk", nargs="+", dest="apks", required=True, help="Path to APK file(s)")
     parser.add_argument("--changelog", help="Path to changelog.json")
     parser.add_argument("--output", default="update.json", help="Output path for update.json")
     parser.add_argument("--aapt2", default="aapt2", help="Path to aapt2 binary")

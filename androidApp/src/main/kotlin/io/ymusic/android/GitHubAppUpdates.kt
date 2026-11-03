@@ -5,6 +5,9 @@ import io.ymusic.ui.AppUpdateStatus
 import io.ymusic.ui.AppUpdates
 import io.ymusic.ui.UpdateCheck
 import io.ymusic.ui.UpdateDownload
+import io.ymusic.updater.GitHubUpdateApk
+import io.ymusic.updater.GitHubUpdateLogic
+import io.ymusic.updater.GitHubUpdateManifest
 import kmpcommon.log.Logger
 import kmphttp.KmpHttpClient
 import kmphttp.RequestBuilder
@@ -23,7 +26,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
 import okio.Buffer
 import okio.FileSystem
 import okio.HashingSink
@@ -53,23 +55,7 @@ class GitHubAppUpdates(
 ) : AppUpdates {
 
     companion object {
-        const val UPDATE_JSON_URL = "https://github.com/Govind-v-kartha/ymusic/releases/latest/download/update.json"
-        const val RELEASES_WEB_URL = "https://github.com/Govind-v-kartha/ymusic/releases"
-        private const val MAX_UPDATE_JSON_BYTES = 64 * 1024L // 64 KB cap
-        private const val ALLOWED_APK_HOST = "github.com"
-        private const val ALLOWED_OBJECTS_HOST = "objects.githubusercontent.com"
         private const val BROWSER_FALLBACK_AFTER_MS = 60 * 60 * 1000L
-
-        private val jsonParser = Json {
-            ignoreUnknownKeys = true
-            isLenient = false
-        }
-
-        fun isAllowedHost(host: String): Boolean =
-            host.equals(ALLOWED_APK_HOST, ignoreCase = true) ||
-            host.equals(ALLOWED_OBJECTS_HOST, ignoreCase = true) ||
-            host.endsWith(".github.com", ignoreCase = true) ||
-            host.endsWith(".githubusercontent.com", ignoreCase = true)
     }
 
     private data class UpdateOffer(
@@ -107,9 +93,9 @@ class GitHubAppUpdates(
         versionCode = update.manifest.versionCode,
         versionName = update.manifest.versionName,
         notes = update.manifest.notes.joinToString("\n"),
-        changelogUrl = "$RELEASES_WEB_URL/tag/${update.manifest.tag}",
+        changelogUrl = "${GitHubUpdateLogic.RELEASES_WEB_URL}/tag/${update.manifest.tag}",
         installInApp = true,
-        downloadPage = RELEASES_WEB_URL,
+        downloadPage = GitHubUpdateLogic.RELEASES_WEB_URL,
         download = download,
     )
 
@@ -173,12 +159,11 @@ class GitHubAppUpdates(
             if (!claimed) return@launch
             try {
                 withContext(Dispatchers.IO) { fetch(update) }
-                // Post-download archive, version, and signature verification
+                // Post-download archive, package, version, and full certificate verification
                 val verifyResult = withContext(Dispatchers.IO) {
                     ApkSignatureVerifier.verify(
                         context = context,
                         apkFile = apkFile(update),
-                        expectedPackageName = context.packageName,
                         installedVersionCode = currentVersionCode,
                     )
                 }
@@ -237,10 +222,9 @@ class GitHubAppUpdates(
                     val apk = apkFile(update)
                     // Verify signature one last time before committing session
                     val verifyResult = ApkSignatureVerifier.verify(
-                        context,
-                        apk,
-                        context.packageName,
-                        currentVersionCode,
+                        context = context,
+                        apkFile = apk,
+                        installedVersionCode = currentVersionCode,
                     )
                     if (verifyResult is ApkSignatureVerifier.VerificationResult.Error) {
                         apk.delete()
@@ -290,12 +274,13 @@ class GitHubAppUpdates(
     override suspend fun checkNow(): UpdateCheck {
         return try {
             val manifest = withContext(Dispatchers.IO) { fetchUpdateManifest(client) }
+            val installedPackage = context.packageName
             if (manifest == null) {
                 UpdateCheck.Failed
-            } else if (manifest.versionCode > currentVersionCode) {
+            } else if (GitHubUpdateLogic.isUpdateAvailable(currentVersionCode, manifest.versionCode, installedPackage, manifest.packageName)) {
                 val apk = manifest.apks.firstOrNull { it.abi == "arm64-v8a" } ?: manifest.apks.firstOrNull()
                 if (apk != null) {
-                    val url = "https://github.com/Govind-v-kartha/ymusic/releases/download/${manifest.tag}/${apk.fileName}"
+                    val url = GitHubUpdateLogic.deriveApkDownloadUrl(manifest.tag, apk.fileName)
                     offer.value = UpdateOffer(manifest, apk, url)
                     UpdateCheck.Found
                 } else {
@@ -324,7 +309,7 @@ class GitHubAppUpdates(
 /** Pure helper to fetch and strictly parse update.json with 64KB cap and HTTPS enforcement. */
 internal suspend fun fetchUpdateManifest(client: KmpHttpClient): GitHubUpdateManifest? {
     val req = RequestBuilder()
-        .url(GitHubAppUpdates.UPDATE_JSON_URL)
+        .url(GitHubUpdateLogic.UPDATE_JSON_URL)
         .header("Cache-Control", "no-cache")
         .header("Accept", "application/json")
         .get()
@@ -336,24 +321,22 @@ internal suspend fun fetchUpdateManifest(client: KmpHttpClient): GitHubUpdateMan
         val source = response.body.asyncSource()
         val buffer = Buffer()
         var totalRead = 0L
-        val maxCap = 64 * 1024L
         while (true) {
             val read = source.read(buffer, 8192L)
             if (read == -1L) break
             totalRead += read
-            if (totalRead > maxCap) {
+            if (totalRead > GitHubUpdateLogic.MAX_UPDATE_JSON_BYTES) {
                 throw IllegalStateException("update.json exceeded 64 KB cap ($totalRead bytes)")
             }
         }
         val text = buffer.readUtf8()
-        val jsonParser = Json { ignoreUnknownKeys = true; isLenient = false }
-        return jsonParser.decodeFromString<GitHubUpdateManifest>(text)
+        return GitHubUpdateLogic.parseManifest(text)
     } finally {
         response.close()
     }
 }
 
-/** Pure helper to download APK with size cap and host allowlist check. */
+/** Pure helper to download APK with size cap and exact host allowlist check. */
 internal suspend fun downloadApkSafely(
     client: KmpHttpClient,
     url: String,
@@ -372,7 +355,7 @@ internal suspend fun downloadApkSafely(
             throw SecurityException("Insecure non-https download rejected: $currentUrl")
         }
         val host = parsedUri.host ?: throw IllegalArgumentException("Missing host in APK URL")
-        if (!GitHubAppUpdates.isAllowedHost(host)) {
+        if (!GitHubUpdateLogic.isAllowedHost(host)) {
             throw SecurityException("Disallowed download host: $host")
         }
 
@@ -416,7 +399,7 @@ internal suspend fun downloadApkSafely(
             }
 
             val downloadedHash = hashing.hash.hex()
-            if (downloadedHash != expectedSha256) {
+            if (!downloadedHash.equals(expectedSha256, ignoreCase = true)) {
                 part.delete()
                 throw IllegalStateException("SHA-256 mismatch: expected $expectedSha256, got $downloadedHash")
             }
@@ -427,4 +410,3 @@ internal suspend fun downloadApkSafely(
     }
     throw IllegalStateException("Too many redirects downloading APK")
 }
-
