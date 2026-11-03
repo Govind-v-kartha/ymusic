@@ -11,7 +11,7 @@
 #define AppName "YMusic"
 #define AppExeName "YMusic.exe"
 ; Never change: Inno finds the previous install by AppId, so a new one would install side by side.
-#define AppId "{{6F3C2B9E-4D1A-4E8B-9A57-2C1F0D8E7B34}"
+#define AppId "{{B83F7249-16C3-4E8A-9A2E-8E5F7C0D9B12}"
 
 [Setup]
 AppId={#AppId}
@@ -20,7 +20,7 @@ AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
 AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
-AppSupportURL={#AppURL}
+AppSupportURL={#AppSupportURL}
 AppUpdatesURL={#AppURL}
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}

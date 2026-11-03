@@ -27,10 +27,10 @@ compose.resources {
     packageOfResClass = "io.ymusic.desktop.resources"
 }
 
-val desktopVersion = appVersionName()
+val desktopVersion = System.getenv("YMUSIC_DESKTOP_VERSION")?.takeIf { it.isNotBlank() } ?: appVersionName()
 // BUMP ON EVERY RELEASE. The update check compares this and nothing else — desktopVersion is a
 // display string. Desktop counts separately from androidApp's versionCode (separate cadence).
-val desktopVersionCode = 18
+val desktopVersionCode = System.getenv("YMUSIC_DESKTOP_VERSION_CODE")?.toIntOrNull() ?: 18
 version = desktopVersion
 
 /** The first candidate JDK that carries jpackage — the marker for "full JDK, not a JBR/JRE". */
@@ -327,10 +327,10 @@ compose.desktop {
         }
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "YMusic"
+            packageName = if (hostOs == "linux") "ymusic-personal" else "YMusic"
             packageVersion = desktopVersion
             description = "Music player"
-            vendor = "YMusic"
+            vendor = "Govind-v-kartha"
             macOS {
                 // Stable across releases: the updater and Gatekeeper both identify the app by it.
                 bundleID = "io.ymusic.desktop"
@@ -378,7 +378,7 @@ compose.desktop {
             windows {
                 // Fixed for the app's lifetime: a new MSI with the same upgrade code replaces the
                 // installed one instead of installing beside it. Per-machine, under Program Files.
-                upgradeUuid = "6f3c2b9e-4d1a-4e8b-9a57-2c1f0d8e7b34"
+                upgradeUuid = "b83f7249-16c3-4e8a-9a2e-8e5f7c0d9b12"
                 perUserInstall = false
                 menu = true
                 shortcut = true
@@ -469,9 +469,19 @@ if (hostOs == "linux") {
             val root = File(temporaryDir, "deb").apply { deleteRecursively() }
             run("dpkg-deb", "-R", deb.path, root.path)
             val control = File(root, "DEBIAN/control")
-            control.writeText(control.readText().trimEnd() + "\nHomepage: https://ymusic.io\n")
+            val controlContent = control.readText().trimEnd()
+                .replace(Regex("(?m)^Maintainer:.*$"), "")
+            control.writeText(
+                controlContent +
+                    "\nMaintainer: Govind-v-kartha <https://t.me/SethuramaIyer_CBI>" +
+                    "\nHomepage: https://github.com/Govind-v-kartha/ymusic\n",
+            )
             root.walk().filter { it.isFile && it.name.endsWith(".desktop") }.forEach {
-                it.writeText(it.readText().trimEnd() + "\nStartupWMClass=io-ymusic-desktop-MainKt\n")
+                val existing = it.readText()
+                val withCategory = if (!existing.contains("Categories=")) {
+                    existing.trimEnd() + "\nCategories=AudioVideo;Audio;Player;\n"
+                } else existing
+                it.writeText(withCategory.trimEnd() + "\nStartupWMClass=io-ymusic-desktop-MainKt\n")
             }
             run("dpkg-deb", "--root-owner-group", "--build", root.path, deb.path)
             root.deleteRecursively()
@@ -582,8 +592,9 @@ val packageReleaseInnoSetup by tasks.registering(Exec::class) {
             isccPath.get().absolutePath,
             "/Qp",
             "/DAppVersion=$desktopVersion",
-            "/DAppPublisher=YMusic",
-            "/DAppURL=https://ymusic.io",
+            "/DAppPublisher=Govind-v-kartha",
+            "/DAppURL=https://github.com/Govind-v-kartha/ymusic",
+            "/DAppSupportURL=https://t.me/SethuramaIyer_CBI",
             "/DAppSourceDir=${appDir.get().asFile.absolutePath}",
             "/DIconFile=${iconFile.absolutePath}",
             "/DOutputDir=${out.absolutePath}",

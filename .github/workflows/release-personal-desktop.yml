@@ -1,0 +1,344 @@
+name: release-personal-desktop
+
+on:
+  push:
+    tags:
+      - 'v*-personal.*'
+      - 'desktop-test-*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FFMPEG_BUILD_REPO: ymusic-io/ffmpeg-build
+  FFMPEG_BUILD_REF: d0a89492c442dbca24dfabd044b866299f0a97b1
+  YMUSIC_REMOTE_CONFIG_URL: ""
+
+jobs:
+  build-windows:
+    name: Build Windows x64 (portable zip & installer)
+    runs-on: windows-latest
+    steps:
+      - name: Disable Git CRLF conversion
+        run: git config --global core.autocrlf false
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: YMusicV4
+
+      - name: Cache ffmpeg windows-x86_64
+        id: cache-ffmpeg
+        uses: actions/cache@v4
+        with:
+          path: ffmpeg-build/out/windows-x86_64
+          key: desktop-ffmpeg-windows-x86_64-${{ env.FFMPEG_BUILD_REF }}
+
+      - name: Checkout ffmpeg-build
+        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.FFMPEG_BUILD_REPO }}
+          ref: ${{ env.FFMPEG_BUILD_REF }}
+          path: ffmpeg-build
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Setup MSYS2 for building ffmpeg
+        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git make diffutils autoconf automake libtool patch
+            mingw-w64-x86_64-toolchain mingw-w64-x86_64-nasm mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-meson mingw-w64-x86_64-ninja mingw-w64-x86_64-zlib
+
+      - name: Build ffmpeg windows-x86_64
+        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        shell: msys2 {0}
+        working-directory: ffmpeg-build
+        env:
+          HOST_CC: gcc
+        run: |
+          scripts/build-desktop.sh || {
+            for log in .deps/.build/*/config.log; do
+              [ -f "$log" ] && { echo "::group::$log"; tail -n 80 "$log"; echo "::endgroup::"; }
+            done
+            exit 1
+          }
+
+      - name: Setup MSYS2 MinGW toolchain for :quickjs and :mse
+        id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: mingw-w64-x86_64-toolchain
+
+      - name: Locate MinGW
+        shell: bash
+        run: echo "MINGW_HOME=$(cygpath -m '${{ steps.msys2.outputs.msys2-location }}')/mingw64" >> "$GITHUB_ENV"
+
+      - name: Install Inno Setup
+        shell: bash
+        env:
+          INNO_SETUP_VERSION: 6.7.1
+        run: |
+          set -euo pipefail
+          find_iscc() {
+            ls "/c/Program Files (x86)/Inno Setup "*/ISCC.exe "/c/Program Files/Inno Setup "*/ISCC.exe \
+              "$(cygpath -u "$LOCALAPPDATA")/Programs/Inno Setup "*/ISCC.exe 2>/dev/null | head -n 1 || true
+          }
+          iscc="$(find_iscc)"
+          [ -n "$iscc" ] || { choco install innosetup --version "$INNO_SETUP_VERSION" -y --no-progress; iscc="$(find_iscc)"; }
+          [ -n "$iscc" ] || { echo "ISCC.exe not found after installing Inno Setup" >&2; exit 1; }
+          echo "using $iscc"
+          echo "INNO_ISCC=$(cygpath -w "$iscc")" >> "$GITHUB_ENV"
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Extract Tag and Version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" =~ ^refs/tags/(.*) ]]; then
+            TAG="${BASH_REMATCH[1]}"
+          else
+            TAG="dev-${GITHUB_SHA::8}"
+          fi
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          if [[ "$TAG" =~ ^v?([0-9]+)\.([0-9]+)\.([0-9]+)(-personal\.([0-9]+))? ]]; then
+            MAJOR="${BASH_REMATCH[1]}"
+            MINOR="${BASH_REMATCH[2]}"
+            BUILD="${BASH_REMATCH[5]}"
+            if [ -n "$BUILD" ]; then
+              VERSION_NUM="${MAJOR}.${MINOR}.${BUILD}"
+            else
+              VERSION_NUM="${MAJOR}.${MINOR}.${BASH_REMATCH[3]}"
+            fi
+          else
+            VERSION_NUM="4.0.0"
+          fi
+          echo "YMUSIC_DESKTOP_VERSION=$VERSION_NUM" >> "$GITHUB_ENV"
+          echo "Building Windows desktop for TAG: $TAG (jpackage version: $VERSION_NUM)"
+
+      - name: Build Windows Inno Setup installer and distributable
+        shell: bash
+        working-directory: YMusicV4
+        run: >-
+          PATH="$(cygpath -u "$MINGW_HOME")/bin:$PATH" ./gradlew -Pproduction=true "-Pinno.iscc=$INNO_ISCC"
+          :desktopApp:packageReleaseInnoSetup
+
+      - name: Package Windows portable zip and installer
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          cd YMusicV4/desktopApp/build/compose/binaries/main-release/app
+          7z a -tzip -mx=9 "../../../../../../artifacts/YMusic-${TAG}-windows-x64.zip" YMusic/
+          cd ../../../../../..
+          cp YMusicV4/desktopApp/build/compose/binaries/main-release/innosetup/*.exe "artifacts/YMusic-${TAG}-windows-x64-setup.exe"
+          ls -la artifacts/
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows-x64
+          path: artifacts/*
+          retention-days: 14
+          if-no-files-found: error
+
+  build-linux:
+    name: Build Linux x64 (portable tar.gz & deb)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: YMusicV4
+
+      - name: Cache ffmpeg linux-x86_64
+        id: cache-ffmpeg
+        uses: actions/cache@v4
+        with:
+          path: ffmpeg-build/out/linux-x86_64
+          key: desktop-ffmpeg-linux-x86_64-${{ env.FFMPEG_BUILD_REF }}-ubuntu22
+
+      - name: Checkout ffmpeg-build
+        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.FFMPEG_BUILD_REPO }}
+          ref: ${{ env.FFMPEG_BUILD_REF }}
+          path: ffmpeg-build
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Build ffmpeg linux-x86_64
+        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        working-directory: ffmpeg-build
+        run: |
+          sudo apt-get update && sudo apt-get install -y nasm automake autoconf libtool pkg-config meson ninja-build patchelf
+          scripts/build-desktop.sh || {
+            for log in .deps/.build/*/config.log; do
+              [ -f "$log" ] && { echo "::group::$log"; tail -n 80 "$log"; echo "::endgroup::"; }
+            done
+            exit 1
+          }
+
+      - name: Install Linux build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libpulse-dev fakeroot build-essential
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Extract Tag and Version
+        run: |
+          if [[ "$GITHUB_REF" =~ ^refs/tags/(.*) ]]; then
+            TAG="${BASH_REMATCH[1]}"
+          else
+            TAG="dev-${GITHUB_SHA::8}"
+          fi
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          if [[ "$TAG" =~ ^v?([0-9]+)\.([0-9]+)\.([0-9]+)(-personal\.([0-9]+))? ]]; then
+            MAJOR="${BASH_REMATCH[1]}"
+            MINOR="${BASH_REMATCH[2]}"
+            BUILD="${BASH_REMATCH[5]}"
+            if [ -n "$BUILD" ]; then
+              VERSION_NUM="${MAJOR}.${MINOR}.${BUILD}"
+            else
+              VERSION_NUM="${MAJOR}.${MINOR}.${BASH_REMATCH[3]}"
+            fi
+          else
+            VERSION_NUM="4.0.0"
+          fi
+          echo "YMUSIC_DESKTOP_VERSION=$VERSION_NUM" >> "$GITHUB_ENV"
+          echo "Building Linux desktop for TAG: $TAG (jpackage version: $VERSION_NUM)"
+
+      - name: Build Linux .deb and distributable
+        working-directory: YMusicV4
+        run: ./gradlew -Pproduction=true :desktopApp:packageReleaseDeb
+
+      - name: Package Linux portable tar.gz and deb
+        run: |
+          mkdir -p artifacts
+          cd YMusicV4/desktopApp/build/compose/binaries/main-release/app
+          tar -czf "../../../../../../artifacts/YMusic-${TAG}-linux-x64.tar.gz" ymusic-personal/
+          cd ../../../../../..
+          cp YMusicV4/desktopApp/build/compose/binaries/main-release/deb/*.deb "artifacts/YMusic-${TAG}-linux-x64.deb"
+          ls -la artifacts/
+
+      - name: Inspect and Smoke Test Debian Package
+        run: |
+          DEB="artifacts/YMusic-${TAG}-linux-x64.deb"
+          echo "=== dpkg-deb --info ==="
+          dpkg-deb --info "$DEB"
+          echo "=== dpkg-deb --contents ==="
+          dpkg-deb --contents "$DEB"
+          echo "=== Install and Smoke Test ==="
+          sudo dpkg -i "$DEB" || sudo apt-get install -f -y
+          echo "=== Dynamic link verification (ldd) ==="
+          ldd /opt/ymusic-personal/bin/ymusic-personal
+          ldd /opt/ymusic-personal/lib/app/resources/common/libmseffmpegjni.so
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-linux-x64
+          path: artifacts/*
+          retention-days: 14
+          if-no-files-found: error
+
+  publish-desktop:
+    name: Publish Desktop Assets to Release
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-windows-x64
+          path: release-assets
+
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-linux-x64
+          path: release-assets
+
+      - name: Generate Checksums
+        working-directory: release-assets
+        run: |
+          ls -lh
+          sha256sum YMusic-* > SHA256SUMS-desktop.txt
+          cat SHA256SUMS-desktop.txt
+
+      - name: Upload combined desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-all-release-assets
+          path: release-assets/*
+          retention-days: 14
+
+      - name: Poll and Upload to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "$GITHUB_REF" =~ ^refs/tags/v.*-personal\..* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            echo "Release tag detected: $TAG"
+            echo "Polling for GitHub release creation by Android workflow (up to 90 minutes)..."
+            MAX_ATTEMPTS=180
+            ATTEMPT=0
+            RELEASE_FOUND=false
+            while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+              if gh release view "$TAG" > /dev/null 2>&1; then
+                echo "Release $TAG found!"
+                RELEASE_FOUND=true
+                break
+              fi
+              ATTEMPT=$((ATTEMPT + 1))
+              echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Release $TAG not found yet. Sleeping 30s..."
+              sleep 30
+            done
+
+            if [ "$RELEASE_FOUND" != "true" ]; then
+              echo "ERROR: Timed out waiting for Android workflow to create release $TAG" >&2
+              exit 1
+            fi
+
+            echo "Uploading desktop assets to release $TAG with --clobber..."
+            cd release-assets
+            gh release upload "$TAG" YMusic-* SHA256SUMS-desktop.txt --clobber
+            echo "Desktop assets successfully attached to release $TAG!"
+          else
+            echo "Trigger is not a v*-personal.* tag ($GITHUB_REF): skipping release upload."
+            echo "Desktop binaries are available in workflow artifacts."
+          fi
