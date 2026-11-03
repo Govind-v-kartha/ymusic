@@ -48,9 +48,9 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 /** The premium badge's green chip (mockup values; dark counterparts keep the same relationships). */
-private val BrandGreenInk: Color @Composable get() = if (DesignColors.isDark) Color(0xFF4ADE80) else Color(0xFF15803D)
-private val BrandGreenBg: Color @Composable get() = if (DesignColors.isDark) Color(0xFF11301C) else Color(0xFFEAFAF0)
-private val BrandGreenBorder: Color @Composable get() = if (DesignColors.isDark) Color(0xFF1D4A2C) else Color(0xFFCDEED9)
+private val BrandGreenInk: Color @Composable get() = DesignColors.BrandGreen
+private val BrandGreenBg: Color @Composable get() = DesignColors.BrandGreen.copy(alpha = if (DesignColors.isDark) 0.15f else 0.10f)
+private val BrandGreenBorder: Color @Composable get() = DesignColors.BrandGreen.copy(alpha = if (DesignColors.isDark) 0.35f else 0.25f)
 
 /** The navigation drawer (design/final/drawer.html): brand header + three nav sections. */
 @Composable

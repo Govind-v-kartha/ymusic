@@ -33,4 +33,4 @@ fun FrameWindowScope.paintWindowGround(color: Color) {
 
 /** The ground a window should wear, for a given appearance. */
 fun groundColorFor(dark: Boolean): Color =
-    if (dark) io.ymusic.ui.DarkDesignColors.Surface else io.ymusic.ui.LightDesignColors.SurfaceElevated
+    if (dark) io.ymusic.personal.PersonalDarkPalette.Surface else io.ymusic.personal.PersonalLightPalette.SurfaceElevated
