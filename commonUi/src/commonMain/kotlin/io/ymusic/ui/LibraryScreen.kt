@@ -1526,7 +1526,7 @@ internal fun SongRow(song: MediaStoreItem, coordinator: PlaybackCoordinator? = n
             .fillMaxWidth()
             .clickable(onClick = onPlay)
             .a11yActionLabel(listOfNotNull(song.title, length, sub.ifEmpty { null }).joinToString(", "))
-            .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            .padding(start = 16.dp, end = 4.dp, top = if (isDesktopPlatform()) 4.dp else 8.dp, bottom = if (isDesktopPlatform()) 4.dp else 8.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.Top,
     ) {
@@ -1834,9 +1834,10 @@ internal fun LibraryThumb(
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(corner)
+    val thumbSize = if (isDesktopPlatform()) 40.dp else 56.dp
     Box(
         modifier = modifier
-            .size(56.dp)
+            .size(thumbSize)
             .clip(shape),
         contentAlignment = Alignment.Center,
     ) {
