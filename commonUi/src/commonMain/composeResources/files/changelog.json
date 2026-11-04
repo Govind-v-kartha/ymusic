@@ -1,5 +1,19 @@
 [
   {
+    "id": 6,
+    "version": "Desktop overhaul & system integration",
+    "date": "2026-11-04",
+    "notes": [
+      "Windows SMTC and Linux MPRIS D-Bus media session controls",
+      "Global OS media hotkeys on Windows and optional show/hide shortcut",
+      "Desktop layout with 72dp navigation rail and persistent Now Playing side panel",
+      "Compact 48dp library rows and drag-and-drop local audio file opening",
+      "Windows taskbar download progress bar and desktop completion notifications",
+      "Audio file associations in Windows installer and Linux package",
+      "Settings toggle for resume playback on launch and launch at login"
+    ]
+  },
+  {
     "id": 5,
     "version": "Language and mood autoplay mix",
     "date": "2026-11-03",
