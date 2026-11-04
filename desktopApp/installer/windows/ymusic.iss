@@ -46,12 +46,14 @@ ArchitecturesInstallIn64BitMode={#Arch}
 MinVersion=10.0
 CloseApplications=force
 RestartApplications=no
+ChangesAssociations=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "associatefiles"; Description: "Register in 'Open with' for common audio formats (.mp3, .m4a, .flac, .opus, .ogg, .wav)"; Flags: unchecked
 
 ; An upgrade replaces the app image wholesale: jars and DLLs the new version dropped must not linger.
 [InstallDelete]
@@ -67,3 +69,14 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: deskto
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(AppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+
+[Registry]
+Root: HKA; Subkey: "Software\Classes\.mp3\OpenWithProgids"; ValueType: string; ValueName: "YMusic.Audio"; ValueData: ""; Flags: uninsdeletevalue; Tasks: associatefiles
+Root: HKA; Subkey: "Software\Classes\.m4a\OpenWithProgids"; ValueType: string; ValueName: "YMusic.Audio"; ValueData: ""; Flags: uninsdeletevalue; Tasks: associatefiles
+Root: HKA; Subkey: "Software\Classes\.flac\OpenWithProgids"; ValueType: string; ValueName: "YMusic.Audio"; ValueData: ""; Flags: uninsdeletevalue; Tasks: associatefiles
+Root: HKA; Subkey: "Software\Classes\.opus\OpenWithProgids"; ValueType: string; ValueName: "YMusic.Audio"; ValueData: ""; Flags: uninsdeletevalue; Tasks: associatefiles
+Root: HKA; Subkey: "Software\Classes\.ogg\OpenWithProgids"; ValueType: string; ValueName: "YMusic.Audio"; ValueData: ""; Flags: uninsdeletevalue; Tasks: associatefiles
+Root: HKA; Subkey: "Software\Classes\.wav\OpenWithProgids"; ValueType: string; ValueName: "YMusic.Audio"; ValueData: ""; Flags: uninsdeletevalue; Tasks: associatefiles
+Root: HKA; Subkey: "Software\Classes\YMusic.Audio"; ValueType: string; ValueName: ""; ValueData: "YMusic audio file"; Flags: uninsdeletekey; Tasks: associatefiles
+Root: HKA; Subkey: "Software\Classes\YMusic.Audio\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#AppExeName},0"; Tasks: associatefiles
+Root: HKA; Subkey: "Software\Classes\YMusic.Audio\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExeName}"" ""%1"""; Tasks: associatefiles

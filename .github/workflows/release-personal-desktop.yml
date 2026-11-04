@@ -18,6 +18,7 @@ env:
   FFMPEG_BUILD_REPO: ymusic-io/ffmpeg-build
   FFMPEG_BUILD_REF: d0a89492c442dbca24dfabd044b866299f0a97b1
   YMUSIC_REMOTE_CONFIG_URL: ""
+  YMUSIC_DESKTOP_VERSION_CODE: ${{ github.run_number }}
 
 jobs:
   build-windows:

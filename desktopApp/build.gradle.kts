@@ -30,7 +30,9 @@ compose.resources {
 val desktopVersion = System.getenv("YMUSIC_DESKTOP_VERSION")?.takeIf { it.isNotBlank() } ?: appVersionName()
 // BUMP ON EVERY RELEASE. The update check compares this and nothing else — desktopVersion is a
 // display string. Desktop counts separately from androidApp's versionCode (separate cadence).
-val desktopVersionCode = System.getenv("YMUSIC_DESKTOP_VERSION_CODE")?.toIntOrNull() ?: 18
+val ciRunNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+val desktopVersionCode = System.getenv("YMUSIC_DESKTOP_VERSION_CODE")?.toIntOrNull()
+    ?: (if (ciRunNumber != null) 100000 + ciRunNumber else 1)
 version = desktopVersion
 
 /** The first candidate JDK that carries jpackage — the marker for "full JDK, not a JBR/JRE". */
@@ -518,6 +520,15 @@ if (hostOs == "linux") {
             upsertField("Maintainer", maintainerValue)
             upsertField("Homepage", homepageValue)
 
+            // Ensure libdbus-1-3 is listed in Depends for MPRIS JNA integration
+            val dependsIdx = fieldList.indexOfFirst { it.first.equals("Depends", ignoreCase = true) }
+            if (dependsIdx >= 0) {
+                val currentDepends = fieldList[dependsIdx].second
+                if (!currentDepends.contains("libdbus-1-3")) {
+                    fieldList[dependsIdx] = "Depends" to "$currentDepends, libdbus-1-3"
+                }
+            }
+
             // Validate all required Debian fields are present and not empty
             val requiredDebianFields = listOf("Package", "Version", "Architecture", "Maintainer", "Description")
             for (req in requiredDebianFields) {
@@ -551,7 +562,7 @@ if (hostOs == "linux") {
                 val withCategory = if (!existing.contains("Categories=")) {
                     existing.trimEnd() + "\nCategories=AudioVideo;Audio;Player;\n"
                 } else existing
-                it.writeText(withCategory.trimEnd() + "\nStartupWMClass=io-ymusic-desktop-MainKt\n")
+                it.writeText(withCategory.trimEnd() + "\nStartupWMClass=io-ymusic-desktop-MainKt\nMimeType=audio/mpeg;audio/mp4;audio/flac;audio/ogg;video/mp4;audio/x-matroska;audio/webm;\n")
             }
             run("dpkg-deb", "--root-owner-group", "--build", root.path, deb.path)
             root.deleteRecursively()
