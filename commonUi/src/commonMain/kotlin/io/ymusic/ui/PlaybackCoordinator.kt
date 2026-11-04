@@ -11,6 +11,8 @@ import io.ymusic.player.Player
 import io.ymusic.player.PlayerError
 import io.ymusic.player.QueueSource
 import io.ymusic.player.repeat.RepeatConfig
+import io.ymusic.settings.AppSettings
+import io.ymusic.settings.flow
 import io.ymusic.ui.playhistory.PlayAgainSession
 import kmpcommon.log.Logger
 import kmpcommon.log.info
@@ -254,6 +256,19 @@ class PlaybackCoordinator(
             source = saved.sourceToken?.let { NextQueueSource.resume(it, graph.engines, items, log?.fork("queue-source")) },
         )
         return true
+    }
+
+    /**
+     * If [AppSettings.resumeOnLaunch] is enabled and the player's queue is empty,
+     * restore the newest playback session from history.
+     */
+    suspend fun maybeResumeOnLaunch(): Boolean {
+        if (!isDesktopPlatform()) return false
+        if (!graph.settings.flow(AppSettings.resumeOnLaunch).value) return false
+        if (player.queue.value.currentItem != null) return false
+        val store = playHistory?.playAgain ?: return false
+        val latest = store.sessions().firstOrNull() ?: return false
+        return playAgain(latest)
     }
 
     /** Queue [song] right after the current item. */

@@ -75,6 +75,10 @@ import io.ymusic.ui.resources.settings_history_nothing_to_clear
 import io.ymusic.ui.resources.settings_keep_mood
 import io.ymusic.ui.resources.settings_keep_mood_hint
 import io.ymusic.ui.resources.settings_language
+import io.ymusic.ui.resources.settings_launch_at_login
+import io.ymusic.ui.resources.settings_launch_at_login_hint
+import io.ymusic.ui.resources.settings_resume_on_launch
+import io.ymusic.ui.resources.settings_resume_on_launch_hint
 import io.ymusic.ui.resources.settings_section_about
 import io.ymusic.ui.resources.settings_section_appearance
 import io.ymusic.ui.resources.settings_section_content
@@ -209,6 +213,20 @@ fun SettingsScreen(graph: AppGraph, signedIn: Boolean = false, onLogin: () -> Un
                 Res.string.settings_keep_mood,
                 Res.string.settings_keep_mood_hint,
             )
+            if (isDesktopPlatform()) {
+                ToggleRow(
+                    graph,
+                    AppSettings.resumeOnLaunch,
+                    Res.string.settings_resume_on_launch,
+                    Res.string.settings_resume_on_launch_hint,
+                )
+                ToggleRow(
+                    graph,
+                    AppSettings.launchAtLogin,
+                    Res.string.settings_launch_at_login,
+                    Res.string.settings_launch_at_login_hint,
+                )
+            }
             ToggleRow(
                 graph,
                 AppSettings.sponsorBlockEnabled,

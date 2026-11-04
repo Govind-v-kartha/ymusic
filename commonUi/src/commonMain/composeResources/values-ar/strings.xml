@@ -831,4 +831,11 @@
     <string name="settings_song_mix_hint">Balance familiar languages and mood flow in autoplay</string>
     <string name="settings_keep_mood">Keep mood</string>
     <string name="settings_keep_mood_hint">Match calm or energetic tempo with your music flow</string>
+    <string name="settings_resume_on_launch">Resume playback on launch</string>
+    <string name="settings_resume_on_launch_hint">Restore your last playing track and queue when opening the app</string>
+    <string name="settings_launch_at_login">Launch at login</string>
+    <string name="settings_launch_at_login_hint">Start YMusic minimized in the system tray when you log in</string>
+    <string name="smartscreen_title">Windows Defender SmartScreen</string>
+    <string name="smartscreen_message">This personal build is not signed with an EV code certificate. If Windows prompts you on install or update, click More info and then Run anyway.</string>
+    <string name="smartscreen_dismiss">Understood</string>
 </resources>
