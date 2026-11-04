@@ -1,5 +1,7 @@
 package io.ymusic.desktop.media
 
+import io.ymusic.desktop.NativeIntegrationGuard
+import io.ymusic.desktop.ymusicDataDir
 import io.ymusic.player.Player
 import io.ymusic.player.isPlaying
 import kmpcommon.log.Logger
@@ -44,9 +46,8 @@ interface MediaSessionCommands {
 /**
  * The desktop counterpart of Android's MediaSession: publishes playback state to the OS media
  * surface and receives its transport commands. Per-OS backends — macOS is implemented
- * (MPNowPlayingInfoCenter + MPRemoteCommandCenter → Control Center, media keys); Linux (MPRIS over
- * D-Bus) and Windows (SystemMediaTransportControls) have no backend yet, where [create] returns
- * null and the app simply has no OS media surface.
+ * (MPNowPlayingInfoCenter + MPRemoteCommandCenter -> Control Center, media keys); Linux (MPRIS over
+ * D-Bus) and Windows (SystemMediaTransportControls).
  */
 interface DesktopMediaSession {
     fun update(state: MediaSessionState)
@@ -54,16 +55,31 @@ interface DesktopMediaSession {
     fun release()
 
     companion object {
+        var activeSession: DesktopMediaSession? = null
+
         /** The backend for this OS, or null (no backend, or its native setup failed — never fatal). */
         fun create(commands: MediaSessionCommands, logger: Logger? = null): DesktopMediaSession? {
-            val os = System.getProperty("os.name")?.lowercase() ?: return null
-            return when {
-                "mac" in os -> runCatching { MacNowPlayingSession(commands, logger) }
-                    .onFailure {
-                        logger?.log(Logger.Level.WARN, "macOS Now Playing bridge unavailable — media keys dead", it)
-                    }
-                    .getOrNull()
-                else -> null
+            val guard = NativeIntegrationGuard(ymusicDataDir(), logger)
+            return guard.runGuarded {
+                val os = System.getProperty("os.name")?.lowercase() ?: return@runGuarded null
+                when {
+                    "mac" in os -> runCatching { MacNowPlayingSession(commands, logger) }
+                        .onFailure {
+                            logger?.log(Logger.Level.WARN, "macOS Now Playing bridge unavailable - media keys dead", it)
+                        }
+                        .getOrNull()
+                    "win" in os -> runCatching { WindowsMediaSession(commands, logger) }
+                        .onFailure {
+                            logger?.log(Logger.Level.WARN, "Windows Media Session (SMTC) bridge unavailable", it)
+                        }
+                        .getOrNull()
+                    "linux" in os -> runCatching { LinuxMprisSession(commands, logger) }
+                        .onFailure {
+                            logger?.log(Logger.Level.WARN, "Linux MPRIS bridge unavailable", it)
+                        }
+                        .getOrNull()
+                    else -> null
+                }
             }
         }
     }
@@ -102,7 +118,8 @@ fun connectMediaSession(player: Player, scope: CoroutineScope, logger: Logger? =
             }
         },
         logger = logger,
-    ) ?: return null
+    )?.also { DesktopMediaSession.activeSession = it } ?: return null
+
     scope.launch {
         var last: MediaSessionState? = null
         var lastAtMs = 0L
