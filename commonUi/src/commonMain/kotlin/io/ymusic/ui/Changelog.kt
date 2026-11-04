@@ -197,6 +197,7 @@ internal fun ChangelogDialog(
     ElevatedBarDialog(
         title = title,
         onDismiss = onDismiss,
+        maxWidth = if (isDesktopPlatform()) 480.dp else 560.dp,
         canScrollBackward = listState.canScrollBackward,
         canScrollForward = listState.canScrollForward,
         buttons = {

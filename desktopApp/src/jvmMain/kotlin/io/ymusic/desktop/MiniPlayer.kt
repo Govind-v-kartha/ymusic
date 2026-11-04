@@ -309,9 +309,9 @@ private fun MiniPlayerContent(graph: AppGraph, onOpenApp: () -> Unit, onDismiss:
  * lazy `toAwtImage` PainterImage variants as nothing at all.
  */
 @Composable
-fun PlayerTray(icon: Painter, logger: Logger, menu: PopupMenu?, onClick: (screen: Point) -> Unit) {
+fun PlayerTray(icon: Painter, logger: Logger, menu: PopupMenu?, tooltip: String = "YMusic", onClick: (screen: Point) -> Unit) {
     val currentOnClick by rememberUpdatedState(onClick)
-    DisposableEffect(icon, menu) {
+    DisposableEffect(icon, menu, tooltip) {
         val tray = if (SystemTray.isSupported()) SystemTray.getSystemTray() else null
         val trayIcon = tray?.let {
             val px = it.trayIconSize.width
@@ -322,7 +322,7 @@ fun PlayerTray(icon: Painter, logger: Logger, menu: PopupMenu?, onClick: (screen
                     *TRAY_SCALES.map { s -> icon.rasterize(kotlin.math.ceil(px * s).toInt()) }.toTypedArray(),
                 )
             }
-            TrayIcon(image, "YMusic").apply {
+            TrayIcon(image, tooltip).apply {
                 addMouseListener(
                     object : MouseAdapter() {
                         // TrayIcon events carry SCREEN coordinates (there is no component space).
