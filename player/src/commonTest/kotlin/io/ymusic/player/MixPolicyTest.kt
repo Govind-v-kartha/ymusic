@@ -96,7 +96,7 @@ class MixPolicyTest {
 
         // LanguageClassifier should NOT decide language based on this non-decisive channel
         val lang = LanguageClassifier.classify("New Instrumental Track", channel, store)
-        assertEquals(Language.ENGLISH, lang) // falls back to English/Latin text instead of false Indic tag
+        assertEquals(Language.UNKNOWN, lang) // does not falsely decide language without decisive evidence
     }
 
     @Test
@@ -237,8 +237,11 @@ class MixPolicyTest {
         assertEquals(Language.MALAYALAM, LanguageClassifier.classify("New Movie Track", "Manorama Music"))
         assertEquals(Language.MALAYALAM, LanguageClassifier.classify("Classic Track", "Millennium Audios"))
 
-        // Multi-language publisher (Muzik247 = 1pt) with shared word (oru = 1pt) reaches threshold 2
-        assertEquals(Language.MALAYALAM, LanguageClassifier.classify("Oru Romantic Song", "Muzik247"))
+        // Multi-language publisher (Muzik247 = 1pt) with strong unique word (jeevitham = 2pt) reaches decisive Malayalam
+        assertEquals(Language.MALAYALAM, LanguageClassifier.classify("Ente Jeevitham", "Muzik247"))
+
+        // Multi-language publisher with shared word (oru) ties across languages and stays Unknown
+        assertEquals(Language.UNKNOWN, LanguageClassifier.classify("Oru Romantic Song", "Muzik247"))
 
         // Multi-signal artist + shared word
         assertEquals(Language.MALAYALAM, LanguageClassifier.classify("Thumbi Vaa", "K.S. Chithra"))
@@ -438,15 +441,15 @@ class MixPolicyTest {
     @Test
     fun testClassifierOn30ChallengingAndAmbiguousTitles() {
         val challengingSamples = listOf(
-            // 1. Unknown titles in Latin script (no vocabulary in starter dictionary) -> Expected: UNKNOWN
+            // 1. Unknown titles in Latin script (no vocabulary in starter dictionary) -> Expected: UNKNOWN unless channel tag matches
             RadioSample(Language.UNKNOWN, "Kallai Kadavathu Kaattozhinju", "M.G. Radhakrishnan", "Independent Channel"),
-            RadioSample(Language.UNKNOWN, "Velli Nilaavin Thanalil", "Jerry Amaldev", "Malayalam Cassettes"),
+            RadioSample(Language.MALAYALAM, "Velli Nilaavin Thanalil", "Jerry Amaldev", "Malayalam Cassettes"),
             RadioSample(Language.UNKNOWN, "Aayiram Kannumayi Kaathirunnu", "Johnson Master", "Classic Audio"),
             RadioSample(Language.UNKNOWN, "Un Samayalaraiyil", "Prakash Kumar", "Studio South"),
             RadioSample(Language.UNKNOWN, "Poove Sempoove Un Vaasam", "Vidyasagar", "Echo Audio"),
             RadioSample(Language.UNKNOWN, "Kannukkul Pothivaippen", "Santhosh Narayanan", "Madras Beats"),
             RadioSample(Language.UNKNOWN, "Maa Tujhe Salaam Vande", "Various Artists", "Desh Records"),
-            RadioSample(Language.UNKNOWN, "Tu Jahan Jahan Chalega", "Madan Mohan", "Old Hindi Gems"),
+            RadioSample(Language.HINDI, "Tu Jahan Jahan Chalega", "Madan Mohan", "Old Hindi Gems"),
             RadioSample(Language.UNKNOWN, "Ghar Aaja Pardesi Tera", "Uttam Singh", "Folk Heritage"),
             RadioSample(Language.UNKNOWN, "Echoes Pine Valley Instrumental", "Acoustic Forest", "Nature Sounds"),
 
@@ -513,11 +516,67 @@ class MixPolicyTest {
                 evidence.language.name,
                 signalsFormatted,
             ))
+
+            assertEquals(
+                sample.expectedLanguage,
+                evidence.language,
+                "Row ${index + 1}: title='${sample.title}' channel='${sample.channel}' signals=$signalsFormatted",
+            )
         }
 
         val total = challengingSamples.size
         println("-".repeat(120))
         println("TOTALS: Total=$total | Correct=$correctCount | Wrong=$wrongCount | Unknown=$unknownCount")
         println("=================================================")
+    }
+
+    @Test
+    fun testRegressionKannukkulPothivaippenGetsNoSignalFromKk() {
+        val evidence = LanguageClassifier.classifyWithEvidence(
+            title = "Kannukkul Pothivaippen",
+            artist = null,
+            channel = "Madras Beats",
+        )
+        val hasKkSignal = evidence.signals.any { it.first.contains("'kk'", ignoreCase = true) }
+        assertEquals(false, hasKkSignal, "Kannukkul must not match short artist name kk as substring")
+        assertEquals(Language.UNKNOWN, evidence.language)
+    }
+
+    @Test
+    fun testRegressionYesudasAliasesCountAsOneSignal() {
+        val evidence = LanguageClassifier.classifyWithEvidence(
+            title = "K.J. Yesudas Classical Evening",
+            artist = "K.J. Yesudas",
+            channel = "Sabha Audios",
+        )
+        val yesudasSignals = evidence.signals.filter { it.first.contains("yesudas", ignoreCase = true) }
+        assertEquals(1, yesudasSignals.size, "Aliases of the same artist must contribute at most 1 signal")
+        assertEquals(Language.UNKNOWN, evidence.language, "Multilingual singer alone (1 pt) cannot decide Malayalam")
+    }
+
+    @Test
+    fun testRegressionChannelThinkMusicIndiaGivesNoEnglishEvidence() {
+        val evidence = LanguageClassifier.classifyWithEvidence(
+            title = "Folk Celebration Beat",
+            artist = null,
+            channel = "Think Music India",
+        )
+        val hasEnglishSignal = evidence.signals.any { it.first.contains("English", ignoreCase = true) }
+        assertEquals(false, hasEnglishSignal, "Channel name must never contribute English vocabulary evidence")
+        assertEquals(Language.UNKNOWN, evidence.language)
+    }
+
+    @Test
+    fun testRegressionMuzhikkuPinneOruWithWeakPublisherStaysUnknown() {
+        val evidence = LanguageClassifier.classifyWithEvidence(
+            title = "Muzhikku Pinne Oru",
+            artist = null,
+            channel = "Sony Music South",
+        )
+        assertEquals(
+            Language.UNKNOWN,
+            evidence.language,
+            "Shared word 'oru' plus multi-language publisher cannot break tie between Malayalam and Tamil",
+        )
     }
 }

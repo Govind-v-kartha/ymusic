@@ -31,7 +31,12 @@ object LanguageClassifier {
         artistStore: LearnedArtistLanguageStore? = null,
         contextLanguage: Language? = null,
     ): EvidenceResult {
+        val titleText = title.orEmpty().lowercase()
+        val artistText = artist.orEmpty().lowercase()
+        val channelText = channel.orEmpty().lowercase()
+        val titleAndArtist = listOfNotNull(title, artist).joinToString(" ").lowercase()
         val combined = listOfNotNull(title, artist, channel).joinToString(" ").lowercase()
+
         val collectedSignals = mutableListOf<Pair<String, Int>>()
         if (combined.isBlank()) {
             return EvidenceResult(contextLanguage ?: Language.UNKNOWN, collectedSignals)
@@ -44,9 +49,9 @@ object LanguageClassifier {
             return EvidenceResult(scriptLang, collectedSignals)
         }
 
-        // 2. Explicit Keyword tags (e.g. "[Malayalam Song]", "(Tamil Video)") - STRONG = 2
+        // 2. Explicit Keyword tags in channel or title - STRONG = 2
         for ((pattern, lang) in KEYWORD_PATTERNS) {
-            val match = pattern.find(combined)
+            val match = pattern.find(channelText) ?: pattern.find(titleText)
             if (match != null) {
                 collectedSignals += "Keyword tag '${match.value}' ($lang)" to 2
                 return EvidenceResult(lang, collectedSignals)
@@ -68,57 +73,77 @@ object LanguageClassifier {
         // Check Exclusive Channels / Labels (Strong = 2)
         LanguageStarterData.EXCLUSIVE_LABELS.forEach { (lang, labels) ->
             labels.forEach { label ->
-                if (combined.contains(label)) {
+                if (channelText.contains(label) || combined.contains(label)) {
                     scores[lang] = (scores[lang] ?: 0) + 2
                     collectedSignals += "Exclusive label '$label' ($lang)" to 2
                 }
             }
         }
 
-        // Check Multi-Language Publishers / Labels (Weak = 1)
+        // Check Multi-Language Publishers / Labels (Weak = 1, credited to each language they publish)
         LanguageStarterData.WEAK_LABELS.forEach { (lang, labels) ->
             labels.forEach { label ->
-                if (combined.contains(label)) {
+                if (channelText.contains(label) || combined.contains(label)) {
                     scores[lang] = (scores[lang] ?: 0) + 1
                     collectedSignals += "Publisher '$label' ($lang)" to 1
                 }
             }
         }
 
-        // Check Strong Vocabulary (Strong = 2)
+        // Check Strong Vocabulary in title/artist (Strong = 2)
         LanguageStarterData.STRONG_VOCABULARY.forEach { (lang, words) ->
             words.forEach { word ->
-                if (Regex("""\b${Regex.escape(word)}\b""").containsMatchIn(combined)) {
+                if (Regex("""\b${Regex.escape(word)}\b""", RegexOption.IGNORE_CASE).containsMatchIn(titleAndArtist)) {
                     scores[lang] = (scores[lang] ?: 0) + 2
                     collectedSignals += "Strong word '$word' ($lang)" to 2
                 }
             }
         }
 
-        // Check Multilingual Artists (Weak = 1)
-        LanguageStarterData.MULTILINGUAL_ARTISTS.forEach { (lang, artists) ->
-            artists.forEach { art ->
-                if (combined.contains(art)) {
+        // Check Multilingual Artists (Weak = 1 per artist entity across all aliases)
+        LanguageStarterData.MULTILINGUAL_ARTISTS.forEach { (lang, artistGroups) ->
+            artistGroups.forEach { aliases ->
+                val matchedAlias = aliases.firstOrNull { alias ->
+                    if (alias.length < 4) {
+                        // Short names (< 4 chars) match ONLY exact artist field
+                        artist != null && artist.trim().equals(alias, ignoreCase = true)
+                    } else {
+                        // Whole token match on artist or channel, or whole word in title
+                        val pattern = Regex("""\b${Regex.escape(alias)}\b""", RegexOption.IGNORE_CASE)
+                        (artist != null && pattern.containsMatchIn(artist)) ||
+                            (channel != null && pattern.containsMatchIn(channel)) ||
+                            (title != null && pattern.containsMatchIn(title))
+                    }
+                }
+                if (matchedAlias != null) {
                     scores[lang] = (scores[lang] ?: 0) + 1
-                    collectedSignals += "Multilingual artist '$art' ($lang)" to 1
+                    collectedSignals += "Multilingual artist '${aliases.first()}' ($lang)" to 1
                 }
             }
         }
 
-        // Check Shared Vocabulary (Weak = 1)
-        LanguageStarterData.SHARED_VOCABULARY.forEach { (lang, words) ->
-            words.forEach { word ->
-                if (Regex("""\b${Regex.escape(word)}\b""").containsMatchIn(combined)) {
+        // Check Shared Words (Weak = 1, credited to EVERY language they belong to)
+        LanguageStarterData.SHARED_WORDS.forEach { (word, langs) ->
+            if (Regex("""\b${Regex.escape(word)}\b""", RegexOption.IGNORE_CASE).containsMatchIn(titleAndArtist)) {
+                langs.forEach { lang ->
                     scores[lang] = (scores[lang] ?: 0) + 1
-                    collectedSignals += "Shared word '$word' ($lang)" to 1
                 }
+                collectedSignals += "Shared word '$word' (${langs.joinToString(",")})" to 1
             }
         }
 
-        // Best scoring Indic language with score >= 2 wins
-        val bestIndic = scores.filter { it.value >= 2 }.maxByOrNull { it.value }?.key
-        if (bestIndic != null) {
-            return EvidenceResult(bestIndic, collectedSignals)
+        // Best scoring Indic language with score >= 2 wins, but TIES cannot decide
+        val maxIndicScore = scores.values.maxOrNull() ?: 0
+        if (maxIndicScore >= 2) {
+            val topLanguages = scores.filter { it.value == maxIndicScore }.keys.toList()
+            if (topLanguages.size == 1) {
+                return EvidenceResult(topLanguages.first(), collectedSignals)
+            }
+            if (contextLanguage != null && contextLanguage in topLanguages) {
+                collectedSignals += "Tie-breaker by context ($contextLanguage)" to 0
+                return EvidenceResult(contextLanguage, collectedSignals)
+            }
+            // Tie between 2+ languages with equal evidence -> ambiguous, cannot decide
         }
 
         // If score is 1 (single weak signal) and contextLanguage matches that language:
@@ -127,16 +152,22 @@ object LanguageClassifier {
             return EvidenceResult(contextLanguage, collectedSignals)
         }
 
-        // 5. Positive English Detection (words or recognized English artists):
-        val matchedEnglishWords = LanguageStarterData.ENGLISH_POSITIVE_WORDS.filter { word ->
-            Regex("""\b${Regex.escape(word)}\b""").containsMatchIn(combined)
-        }
+        // 5. Positive English Detection (ONLY from title and artist, NEVER from channel/publisher)
         val matchedEnglishArtists = LanguageStarterData.ENGLISH_ARTISTS.filter { art ->
-            combined.contains(art)
+            Regex("""\b${Regex.escape(art)}\b""", RegexOption.IGNORE_CASE).containsMatchIn(titleAndArtist)
         }
-        if (matchedEnglishWords.isNotEmpty() || matchedEnglishArtists.isNotEmpty()) {
-            matchedEnglishWords.forEach { collectedSignals += "English word '$it'" to 2 }
+        val matchedPositiveWords = LanguageStarterData.ENGLISH_POSITIVE_WORDS.filter { word ->
+            Regex("""\b${Regex.escape(word)}\b""", RegexOption.IGNORE_CASE).containsMatchIn(titleAndArtist)
+        }
+        val matchedWeakWords = LanguageStarterData.ENGLISH_WEAK_WORDS.filter { word ->
+            Regex("""\b${Regex.escape(word)}\b""", RegexOption.IGNORE_CASE).containsMatchIn(titleAndArtist)
+        }
+        val totalEnglishWords = (matchedPositiveWords + matchedWeakWords).distinct()
+
+        // English becomes answer only with known English artist or at least 3 English words and no stronger competing signal
+        if ((matchedEnglishArtists.isNotEmpty() || totalEnglishWords.size >= 3) && maxIndicScore < 2) {
             matchedEnglishArtists.forEach { collectedSignals += "English artist '$it'" to 2 }
+            totalEnglishWords.forEach { collectedSignals += "English word '$it'" to 1 }
             return EvidenceResult(Language.ENGLISH, collectedSignals)
         }
 
@@ -146,7 +177,7 @@ object LanguageClassifier {
             return EvidenceResult(contextLanguage, collectedSignals)
         }
 
-        // 7. Latin script with no evidence is UNKNOWN (NEVER default to English!)
+        // 7. Latin script with no decisive evidence is UNKNOWN
         return EvidenceResult(Language.UNKNOWN, collectedSignals)
     }
 
