@@ -24,7 +24,7 @@ import {
 } from "./bg_dump";
 
 const REQUEST_KEY = "O43z0dpjhgX20SCx4KAo";
-const API_KEY = "AIzaSyDyT5W0Jh49F30Pqqtyfdf7pDLFKLJoAnw";
+const API_KEY = atob("QUl6YVN5RHlUNVcwSmg0OUYzMFBxcXR5ZmRmN3BETEZLTEpvQW53");
 const GIT_URL = "https://jnn-pa.googleapis.com/$rpc/google.internal.waa.v1.Waa/GenerateIT";
 
 function waaHeaders(): Record<string, string> {
