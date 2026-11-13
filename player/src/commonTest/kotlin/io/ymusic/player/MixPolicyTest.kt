@@ -210,4 +210,49 @@ class MixPolicyTest {
         assertEquals(0, result.targetCandidateCount)
         assertFalse(result.shouldRefill)
     }
+
+    @Test
+    fun testRomanizedMalayalamClassifiedAsMalayalam() {
+        assertEquals(Language.MALAYALAM, LanguageClassifier.classify("Manikya Malaraya Poovi", "Vineeth Sreenivasan"))
+        assertEquals(Language.MALAYALAM, LanguageClassifier.classify("Neeyilla Neram", "Job Kurian"))
+        assertEquals(Language.MALAYALAM, LanguageClassifier.classify("Aaradhike", "Sushin Shyam"))
+        assertEquals(Language.MALAYALAM, LanguageClassifier.classify("Malare Ninne Kaanathirunnal", "Vijay Yesudas"))
+        assertEquals(Language.MALAYALAM, LanguageClassifier.classify("Vathikkalu Vellaripravu", "Arjun Ashokan"))
+    }
+
+    @Test
+    fun testMalayalamChannelAndArtistHints() {
+        // Label/Channel hints in artist or channel field
+        assertEquals(Language.MALAYALAM, LanguageClassifier.classify("Romantic Melody Song", "Muzik247"))
+        assertEquals(Language.MALAYALAM, LanguageClassifier.classify("Evergreen Hit", "Satyam Jukebox"))
+        assertEquals(Language.MALAYALAM, LanguageClassifier.classify("New Movie Track", "Manorama Music"))
+
+        // Prominent Malayalam artist names
+        assertEquals(Language.MALAYALAM, LanguageClassifier.classify("Chundathu Chempattu", "Hesham Abdul Wahab"))
+        assertEquals(Language.MALAYALAM, LanguageClassifier.classify("Thumbi Vaa", "K.S. Chithra"))
+    }
+
+    @Test
+    fun testMelodyVsEnergeticClassificationAndSelection() {
+        val policy = MixPolicyImpl(
+            songMixEnabled = { true },
+            keepMoodEnabled = { true },
+        )
+
+        // Seed with Malayalam melody
+        val seed = fakeItem("seed", "Aaradhike (Melody Romantic Love Song)", "Sushin Shyam")
+        policy.onManualPlay(seed)
+        assertEquals(Language.MALAYALAM, policy.context.getTargetLanguage())
+        assertEquals(Mood.CALM, policy.context.getTargetMood())
+
+        val items = listOf(
+            fakeItem("0", "DJ Fast Party Club Dance Remix Beat", "Remix King"), // Energetic
+            fakeItem("1", "Malare (Soft Acoustic Slow Piano)", "Vijay Yesudas"), // Calm melody
+            fakeItem("2", "Heavy Bass Trap EDM Workout", "Beat Master"), // Energetic
+        )
+
+        val result = policy.selectNextCandidate(listOf(0, 1, 2), items, currentIndex = 0)
+        // Item 1 is the calm melody matching target language + mood
+        assertEquals(1, result.selectedIndex)
+    }
 }

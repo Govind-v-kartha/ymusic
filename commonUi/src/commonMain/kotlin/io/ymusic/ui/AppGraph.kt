@@ -289,6 +289,7 @@ class AppGraph(
             artistLanguageStore = LearnedArtistLanguageStore(),
             songMixEnabled = { settings.flow(AppSettings.songMix).value },
             keepMoodEnabled = { settings.flow(AppSettings.keepMood).value },
+            preferredLanguage = { settings.flow(AppSettings.preferredLanguage).value },
             logger = logger,
         )
         player.mixPolicy = mixPolicy
@@ -304,6 +305,8 @@ class AppGraph(
             try {
                 val history = playHistory
                 if (history != null && !guest) {
+                    val recentKeys = history.loadRecentPlayedKeys(50)
+                    repeatPolicy.preloadRecentPlays(recentKeys)
                     val sinceMs = Clock.System.now().toEpochMilliseconds() - RepeatConfig.HISTORY_WINDOW_MS
                     history.pruneRepeatEvents(sinceMs)
                     val snapshot = history.loadRecentRepeatEvents(sinceMs)

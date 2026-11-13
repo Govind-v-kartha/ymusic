@@ -12,13 +12,30 @@ object LanguageClassifier {
         Regex("""(?i)\b(english)\b""") to Language.ENGLISH,
     )
 
+    private val MALAYALAM_CHANNEL_OR_LABEL_PATTERNS = Regex(
+        """(?i)\b(muzik247|satyam\s*(?:jukebox|audios)?|saregama\s*malayalam|millennium\s*audios|manorama\s*music|goodwill\s*entertainments|mathrubhumi|speed\s*audio\s*malayalam|saina\s*music|east\s*coast)\b"""
+    )
+
+    private val MALAYALAM_ARTIST_PATTERNS = Regex(
+        """(?i)\b(k\.?\s*j\.?\s*yesudas|yesudas|k\.?\s*s\.?\s*chithra|chithra|m\.?\s*g\.?\s*sreekumar|sreekumar|sushin\s*shyam|hesham\s*abdul\s*wahab|jassie\s*gift|vineeth\s*sreenivasan|sujatha\s*mohan|shaan\s*rahman|gopi\s*sundar|deepak\s*dev|vidyasagar|raveendran|ouseppachan|bijibal|m\.?\s*jayachandran|job\s*kurian|sachin\s*warrier|unni\s*menon|madhu\s*balakrishnan)\b"""
+    )
+
+    private val MALAYALAM_ROMANIZED_KEYWORDS = Regex(
+        """(?i)\b(pennu|kannu|premam|moham|kalyanam|paattu|pattu|gaanam|swapnam|thumbi|oru|njan|ninne|ente|sneham|mazha|kaathu|aaradhike|aradhike|malare|kadavath|poove|vathikkalu|vathil|chundathu|uyire|neeyilla|neram|manikya|malaraya|poovi|kadhakal|thaamara|venal|kaattil|ormakal|manassin|kanmani|priyasakhi|shantham|hridayam|aalroopam|alroopam|illatha|jeevitham|kanneer|snehamodu|theeram|vinnile|kaate|puzha|cheru|punchiri)\b"""
+    )
+
+    private val COMMON_ENGLISH_WORDS = Regex(
+        """(?i)\b(the|and|for|with|you|your|from|this|that|have|what|when|where|who|will|all|would|there|their)\b"""
+    )
+
     fun classify(
         title: String?,
         artist: String? = null,
         artistStore: LearnedArtistLanguageStore? = null,
+        contextLanguage: Language? = null,
     ): Language {
         val combined = listOfNotNull(title, artist).joinToString(" ")
-        if (combined.isBlank()) return Language.UNKNOWN
+        if (combined.isBlank()) return contextLanguage ?: Language.UNKNOWN
 
         // 1. Direct Unicode Script Detection (highest priority)
         val scriptLang = detectScript(combined)
@@ -31,12 +48,34 @@ object LanguageClassifier {
             }
         }
 
-        // 3. Learned artist / channel dictionary
+        // 3. Known Malayalam channel / label / artist hints
+        if (MALAYALAM_CHANNEL_OR_LABEL_PATTERNS.containsMatchIn(combined) ||
+            MALAYALAM_ARTIST_PATTERNS.containsMatchIn(combined)
+        ) {
+            return Language.MALAYALAM
+        }
+
+        // 4. Romanized Malayalam word patterns
+        if (MALAYALAM_ROMANIZED_KEYWORDS.containsMatchIn(combined)) {
+            return Language.MALAYALAM
+        }
+
+        // 5. Learned artist / channel dictionary
         if (artist != null && artistStore != null) {
             artistStore.getDecisiveLanguage(artist)?.let { return it }
         }
 
-        // 4. Fallback: check if predominantly Latin text
+        // 6. Context inheritance: if seed song is Malayalam, and no English stop words dominate
+        if (contextLanguage != null && contextLanguage != Language.UNKNOWN) {
+            if (!COMMON_ENGLISH_WORDS.containsMatchIn(combined)) {
+                return contextLanguage
+            }
+        }
+
+        // 7. Fallback: check if predominantly English text
+        if (COMMON_ENGLISH_WORDS.containsMatchIn(combined)) {
+            return Language.ENGLISH
+        }
         if (hasLatinScript(combined)) {
             return Language.ENGLISH
         }

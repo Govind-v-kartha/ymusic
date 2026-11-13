@@ -3,11 +3,11 @@ package io.ymusic.player.mix
 object MoodClassifier {
 
     private val CALM_PATTERN = Regex(
-        """(?i)\b(acoustic|lofi|lo-fi|ambient|slow|slowed|piano|sleep|calm|relaxing|chill|peaceful|soft|meditation|soothing|unplugged|lullaby)\b"""
+        """(?i)\b(melody|slow|slowed|acoustic|lofi|lo-fi|ambient|piano|sleep|calm|relaxing|chill|peaceful|soft|meditation|soothing|unplugged|lullaby|love\s*song|duet|nostalgia|sad|feel\s*good|heart\s*touching|soulful|romantic)\b"""
     )
 
     private val ENERGETIC_PATTERN = Regex(
-        """(?i)\b(remix|trap|metal|rock|fast|dance|hype|bass boost|bass boosted|edm|party|club|hardstyle|electronic|upbeat|workout|dj|club mix)\b"""
+        """(?i)\b(remix|trap|metal|rock|fast|dance|hype|bass\s*boost(?:ed)?|edm|party|club|hardstyle|electronic|upbeat|workout|dj|club\s*mix|mashup|beat|item\s*song|rap|hip\s*hop|drumbits)\b"""
     )
 
     fun classify(title: String?, artist: String? = null): Mood {

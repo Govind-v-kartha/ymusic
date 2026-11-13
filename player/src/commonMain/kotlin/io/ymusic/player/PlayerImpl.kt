@@ -1,6 +1,7 @@
 package io.ymusic.player
 
 import io.ymusic.player.repeat.RepeatPolicy
+import kotlin.time.Clock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -34,6 +35,13 @@ internal class PlayerImpl(
         get() = controller.repeatPolicy
         set(value) {
             controller.repeatPolicy = value
+            refreshPrepareNext()
+        }
+
+    override var mixPolicy: io.ymusic.player.mix.MixPolicy?
+        get() = controller.mixPolicy
+        set(value) {
+            controller.mixPolicy = value
             refreshPrepareNext()
         }
 
@@ -310,6 +318,11 @@ internal class PlayerImpl(
 
     override fun skipNext() {
         if (released) return
+        val currentItem = controller.state.currentItem
+        val playedMs = progress.value.positionMs
+        if (currentItem != null && playedMs < 30_000L) {
+            mixPolicy?.onQuickSkip(currentItem, playedMs)
+        }
         val pagePick = prepareNextIndex.takeIf { nextFromPage }
         val next = if (pagePick != null) pagePick.also { controller.commitNext(it) } else controller.advance(userInitiated = true)
         if (next != null) {
@@ -542,7 +555,8 @@ internal class PlayerImpl(
         if (!state.hasMore || state.loading || state.error != null) return
         val queue = controller.state
         if (queue.currentIndex < 0) return
-        if (queue.items.lastIndex - queue.currentIndex < LOAD_AHEAD) startLoad(pickNext = false)
+        val remaining = queue.items.lastIndex - queue.currentIndex
+        if (remaining < LOAD_AHEAD || remaining <= 3) startLoad(pickNext = false)
     }
 
     private fun startLoad(pickNext: Boolean) {
@@ -552,30 +566,70 @@ internal class PlayerImpl(
         more = state.copy(loading = true, error = null)
         publishQueue(refreshNext = false)
         sourceJob = scope.launch {
-            val page = try {
-                src.loadMore()
-            } catch (c: CancellationException) {
-                throw c
-            } catch (e: Exception) {
-                if (source === src) {
-                    more = more?.copy(loading = false, error = e)
-                    publishQueue(refreshNext = false)
+            val collectedItems = mutableListOf<PlayableItem>()
+            var lastPageHasMore = true
+            var attempts = 0
+            val maxPages = 3
+            val policy = repeatPolicy
+            val noRepeatHoursVal = controller.noRepeatHours()
+            val nowMs = Clock.System.now().toEpochMilliseconds()
+
+            while (attempts < maxPages && lastPageHasMore) {
+                attempts++
+                val page = try {
+                    src.loadMore()
+                } catch (c: CancellationException) {
+                    throw c
+                } catch (e: Exception) {
+                    if (source === src) {
+                        more = more?.copy(loading = false, error = e)
+                        publishQueue(refreshNext = false)
+                    }
+                    return@launch
                 }
-                return@launch
+                if (released || source !== src) return@launch
+                lastPageHasMore = page.hasMore
+
+                val filtered = if (policy != null && policy.hasHistory && noRepeatHoursVal > 0) {
+                    val eligibleIndices = policy.filterEligibleCandidates(
+                        candidates = page.items.indices.toList(),
+                        items = page.items,
+                        noRepeatHours = noRepeatHoursVal,
+                        isExempt = { false },
+                        now = nowMs,
+                    )
+                    eligibleIndices.map { page.items[it] }
+                } else {
+                    page.items
+                }
+                collectedItems.addAll(filtered)
+
+                if (collectedItems.size >= 2 || !lastPageHasMore) {
+                    break
+                }
             }
+
             if (released || source !== src) return@launch
+            val itemsToAdd = if (collectedItems.isEmpty() && attempts > 0) {
+                emptyList()
+            } else {
+                collectedItems
+            }
+
             val firstNew = controller.state.items.size
-            controller.add(page.items)
+            if (itemsToAdd.isNotEmpty()) {
+                controller.add(itemsToAdd)
+            }
             more = more?.let { current ->
                 current.copy(
                     loading = false,
-                    hasMore = page.hasMore,
-                    totalCount = if (page.hasMore) src.totalCount ?: current.totalCount else controller.state.items.size,
-                    resumeToken = src.resumeToken.takeIf { page.hasMore },
+                    hasMore = lastPageHasMore,
+                    totalCount = if (lastPageHasMore) src.totalCount ?: current.totalCount else controller.state.items.size,
+                    resumeToken = src.resumeToken.takeIf { lastPageHasMore },
                 )
             }
-            if (pickNext && page.items.isNotEmpty() && controller.state.shuffle) {
-                prepareNextIndex = firstNew + random.nextInt(page.items.size)
+            if (pickNext && itemsToAdd.isNotEmpty() && controller.state.shuffle) {
+                prepareNextIndex = firstNew + random.nextInt(itemsToAdd.size)
                 prepareNextArmed = false
                 nextFromPage = true
                 publishQueue(refreshNext = false)

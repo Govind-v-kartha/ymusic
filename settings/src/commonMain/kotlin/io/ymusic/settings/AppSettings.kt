@@ -164,9 +164,12 @@ object AppSettings {
 
     /**
      * Window in hours for no-repeat / fatigue decay filtering (0 = Off).
-     * Options: 0, 1, 2, 3, 4, 6, 12, 24.
+     * Options: 0, 1, 2, 4, 8, 24, 48, 168 (7d), 720 (30d). Default 48h.
      */
-    val noRepeatHours = IntSetting("playback.noRepeatHours", 0)
+    val noRepeatHours = IntSetting("playback.noRepeatHours", 48)
+
+    /** Preferred content language code (e.g. "ml" for Malayalam, "en" for English, "" for any). */
+    val preferredLanguage = StringSetting("playback.preferredLanguage", "ml")
 
     /** Song mix toggle (enabled by default; preserves language ratio and variety). */
     val songMix = BoolSetting("playback.songMix", true)

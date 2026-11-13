@@ -8,6 +8,7 @@ class MixPolicyImpl(
     val context: MixContext = MixContext(),
     private val songMixEnabled: () -> Boolean = { true },
     private val keepMoodEnabled: () -> Boolean = { true },
+    private val preferredLanguage: () -> String = { "ml" },
     var logger: Logger? = null,
 ) : MixPolicy {
 
@@ -18,7 +19,8 @@ class MixPolicyImpl(
         get() = keepMoodEnabled()
 
     override fun onManualPlay(item: PlayableItem) {
-        val lang = LanguageClassifier.classify(item.displayTitle, item.artistName, artistLanguageStore)
+        val seedContext = Language.fromCode(preferredLanguage()).takeIf { it != Language.UNKNOWN }
+        val lang = LanguageClassifier.classify(item.displayTitle, item.artistName, artistLanguageStore, seedContext)
         val mood = MoodClassifier.classify(item.displayTitle, item.artistName)
 
         // Only record observation for artist if direct script/keywords were unambiguous
@@ -32,7 +34,7 @@ class MixPolicyImpl(
 
     override fun onAutoPick(item: PlayableItem) {
         val targetLang = context.getTargetLanguage()
-        val lang = LanguageClassifier.classify(item.displayTitle, item.artistName, artistLanguageStore)
+        val lang = LanguageClassifier.classify(item.displayTitle, item.artistName, artistLanguageStore, targetLang)
         val mood = MoodClassifier.classify(item.displayTitle, item.artistName)
 
         val scriptLang = LanguageClassifier.detectScript(listOfNotNull(item.displayTitle, item.artistName).joinToString(" "))
@@ -45,7 +47,8 @@ class MixPolicyImpl(
     }
 
     override fun onQuickSkip(item: PlayableItem, playDurationMs: Long) {
-        val lang = LanguageClassifier.classify(item.displayTitle, item.artistName, artistLanguageStore)
+        val targetLang = context.getTargetLanguage()
+        val lang = LanguageClassifier.classify(item.displayTitle, item.artistName, artistLanguageStore, targetLang)
         val mood = MoodClassifier.classify(item.displayTitle, item.artistName)
         context.recordQuickSkip(lang, mood)
     }
@@ -59,7 +62,15 @@ class MixPolicyImpl(
             return MixSelectionResult(null, 0, false, "empty")
         }
 
-        val targetLang = context.getTargetLanguage()
+        val prefLang = Language.fromCode(preferredLanguage())
+        val targetLang = if (context.getTargetLanguage() != Language.UNKNOWN) {
+            context.getTargetLanguage()
+        } else if (prefLang != Language.UNKNOWN) {
+            prefLang
+        } else {
+            Language.UNKNOWN
+        }
+
         val targetMood = context.getTargetMood()
         val enforceMood = keepMood && targetMood != Mood.UNKNOWN
         val inDeficit = context.isTargetDeficit()
@@ -74,9 +85,11 @@ class MixPolicyImpl(
 
         val pool = candidates.map { idx ->
             val itm = items[idx]
-            val lang = LanguageClassifier.classify(itm.displayTitle, itm.artistName, artistLanguageStore)
+            val lang = LanguageClassifier.classify(itm.displayTitle, itm.artistName, artistLanguageStore, targetLang)
             val md = MoodClassifier.classify(itm.displayTitle, itm.artistName)
-            val penalized = context.isPenalized(lang, md)
+            val isMismatchLanguage = (targetLang != Language.UNKNOWN && lang != targetLang && lang != Language.UNKNOWN)
+            val isClashingMood = (targetMood == Mood.CALM && md == Mood.ENERGETIC)
+            val penalized = context.isPenalized(lang, md) || isMismatchLanguage || isClashingMood
             CandidateInfo(idx, itm, lang, md, penalized)
         }
 
@@ -100,25 +113,35 @@ class MixPolicyImpl(
                 }
             }
 
-            // Ladder Step 2: Target + Any Mood
+            // Ladder Step 2: Target + Compatible Mood (not clashing energetic if seed is melody)
             if (targetLang != Language.UNKNOWN) {
-                candidatePool.firstOrNull { it.language == targetLang }?.let {
+                candidatePool.firstOrNull {
+                    it.language == targetLang && (!enforceMood || it.mood != Mood.ENERGETIC)
+                }?.let {
                     relaxedStep = "Target+Any"
                     return it
                 }
             }
 
-            // Ladder Step 3: Neutral/Unknown/English + Mood
+            // Ladder Step 3: Neutral/Unknown + Mood
             if (enforceMood) {
                 candidatePool.firstOrNull {
-                    (it.language == Language.UNKNOWN || it.language == Language.ENGLISH) && it.mood == targetMood
+                    (it.language == Language.UNKNOWN || it.language == targetLang) && it.mood == targetMood
                 }?.let {
                     relaxedStep = "Neutral+Mood"
                     return it
                 }
             }
 
-            // Ladder Step 4: Any Language + Mood
+            // Ladder Step 4: Target Language any mood
+            if (targetLang != Language.UNKNOWN) {
+                candidatePool.firstOrNull { it.language == targetLang }?.let {
+                    relaxedStep = "Target+FallbackMood"
+                    return it
+                }
+            }
+
+            // Ladder Step 5: Any Language + Mood
             if (enforceMood) {
                 candidatePool.firstOrNull { it.mood == targetMood }?.let {
                     relaxedStep = "Any+Mood"
@@ -126,7 +149,7 @@ class MixPolicyImpl(
                 }
             }
 
-            // Ladder Step 5: All (Fallback)
+            // Ladder Step 6: All (Fallback)
             candidatePool.firstOrNull()?.let {
                 relaxedStep = "All"
                 return it

@@ -73,6 +73,7 @@ private const val MAX_PLAY_HISTORY = 100
 internal class QueueController(
     private val random: Random = Random.Default,
     var repeatPolicy: RepeatPolicy? = null,
+    var mixPolicy: io.ymusic.player.mix.MixPolicy? = null,
     var noRepeatHours: () -> Int = { 0 },
     var isRadioOrAutoplay: () -> Boolean = { false },
     var onFallbackNotice: (() -> Unit)? = null,
@@ -121,7 +122,11 @@ internal class QueueController(
     fun moveTo(index: Int): Boolean {
         if (index !in state.items.indices) return false
         upNext.clear()
+        val item = state.items.getOrNull(index)
         advanceTo(index)
+        if (item != null) {
+            mixPolicy?.onManualPlay(item)
+        }
         return true
     }
 
@@ -160,6 +165,21 @@ internal class QueueController(
 
         val allowScoreReordering = state.shuffle || isRadioOrAutoplay()
         val now = Clock.System.now().toEpochMilliseconds()
+
+        val mix = mixPolicy
+        if (mix != null && mix.isEnabled && isRadioOrAutoplay()) {
+            val eligible = policy.filterEligibleCandidates(
+                candidates = candidates,
+                items = items,
+                noRepeatHours = noRepeatHours(),
+                isExempt = { false },
+                now = now,
+                onFallbackNotice = onFallbackNotice,
+            )
+            val mixPick = mix.selectNextCandidate(eligible, items, state.currentIndex).selectedIndex
+            if (mixPick != null) return mixPick
+        }
+
         return policy.selectNextIndex(
             candidates = candidates,
             items = items,
@@ -177,10 +197,11 @@ internal class QueueController(
         val unplayed = state.items.indices - shufflePlayed
         if (state.shuffle && unplayed.isEmpty()) shufflePlayed.clear()
         val isExplicitUpNext = upNext.firstOrNull() == index
-        val itemKey = state.items.getOrNull(index)?.repeatKey
+        val item = state.items.getOrNull(index)
         advanceTo(index)
-        if (!isExplicitUpNext && itemKey != null) {
-            repeatPolicy?.recordAutoPlay(itemKey)
+        if (!isExplicitUpNext && item != null) {
+            repeatPolicy?.recordAutoPlay(item.repeatKey, item.canonicalKey)
+            mixPolicy?.onAutoPick(item)
         }
     }
 
