@@ -412,4 +412,58 @@ class PlayerIntegrationTest {
         runCurrent()
         assertTrue(h.player.queue.value.items.any { (it as? PlayableItem.YtMedia)?.videoId == "track_refill_1" })
     }
+
+    @Test
+    fun auto_picked_song_quick_skipped_is_rested_for_1_hour_manual_song_is_not() = runTest {
+        val repeatPolicy = RepeatPolicyImpl(Random(42))
+        repeatPolicy.initSnapshot(emptyMap())
+
+        val h = Harness(this, repeatPolicy = repeatPolicy)
+        h.player.configureRepeatPolicy(noRepeatHours = { 48 })
+
+        val trackManual = PlayableItem.YtMedia("track_manual", title = "Manual Song", artist = "Artist A")
+        val trackAuto = PlayableItem.YtMedia("track_auto", title = "Auto Picked Song", artist = "Artist B")
+        val trackNext = PlayableItem.YtMedia("track_next", title = "Next Song", artist = "Artist C")
+
+        var quickSkippedItem: PlayableItem? = null
+        var quickSkippedWasAuto: Boolean? = null
+        h.player.onTrackQuickSkipped = { item, isAuto ->
+            quickSkippedItem = item
+            quickSkippedWasAuto = isAuto
+        }
+
+        // Set queue with trackManual (manual selection)
+        h.player.setQueue(listOf(trackManual, trackAuto, trackNext), playIndex = 0, playWhenReady = true)
+        runCurrent()
+
+        assertEquals("track_manual", (h.player.queue.value.currentItem as? PlayableItem.YtMedia)?.videoId)
+        assertFalse(h.player.isCurrentItemAutoPicked)
+
+        // 1. Quick skip on manual song (< 10s)
+        h.youtube.tickTo(2000L) // 2s < 10s
+        val now1 = Clock.System.now().toEpochMilliseconds()
+        h.player.skipNext()
+        runCurrent()
+
+        assertEquals(trackManual, quickSkippedItem)
+        assertEquals(false, quickSkippedWasAuto)
+        assertFalse(repeatPolicy.isRested(trackManual.repeatKey, now1))
+
+        // Current item is now trackAuto, which was reached via auto-advance / advance in queue
+        assertEquals("track_auto", (h.player.queue.value.currentItem as? PlayableItem.YtMedia)?.videoId)
+        assertTrue(h.player.isCurrentItemAutoPicked)
+
+        // 2. Quick skip on auto-picked song (< 10s)
+        h.youtube.tickTo(3000L) // 3s < 10s
+        val now2 = Clock.System.now().toEpochMilliseconds()
+        h.player.skipNext()
+        runCurrent()
+
+        assertEquals(trackAuto, quickSkippedItem)
+        assertEquals(true, quickSkippedWasAuto)
+        assertTrue(repeatPolicy.isRested(trackAuto.repeatKey, now2))
+        val restUntil = repeatPolicy.restUntil(trackAuto.repeatKey, now2)
+        assertNotNull(restUntil)
+        assertTrue(restUntil >= now2 + 3500_000L) // ~1 hour rest
+    }
 }

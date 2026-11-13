@@ -74,6 +74,14 @@ class PlaybackCoordinator(
                 }
             }
         }
+        player.onTrackQuickSkipped = { item, isAutoPicked ->
+            if (isAutoPicked) {
+                restItem(item, RepeatConfig.SKIP_REST_DURATION_MS)
+                log?.log(Logger.Level.INFO, "Auto-picked track quick-skipped (<10s), resting for 1h: ${item.repeatKey}")
+            } else {
+                log?.log(Logger.Level.DEBUG, "Manual track quick-skipped, no rest: ${item.repeatKey}")
+            }
+        }
         val pruneUngrantedFolders = graph.pruneUngrantedFolders
         if (pruneUngrantedFolders != null) {
             scope.launch {

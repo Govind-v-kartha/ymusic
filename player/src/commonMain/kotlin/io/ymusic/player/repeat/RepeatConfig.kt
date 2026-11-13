@@ -14,4 +14,5 @@ object RepeatConfig {
     const val SESSION_IDLE_TIMEOUT_MS = 3 * 60 * 60 * 1000L
     const val ROTATION_DECAY_DAYS = 30
     const val QUICK_SKIP_THRESHOLD_MS = 10_000L
+    const val SKIP_REST_DURATION_MS = 3600_000L
 }

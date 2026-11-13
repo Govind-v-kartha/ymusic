@@ -92,12 +92,16 @@ internal class QueueController(
 
     val hasUpNext: Boolean get() = upNext.isNotEmpty()
 
+    var isCurrentItemAutoPicked: Boolean = false
+        private set
+
     fun setQueue(items: List<PlayableItem>, playIndex: Int, queueId: String? = null) {
         val index = if (items.isEmpty()) -1 else playIndex.coerceIn(0, items.lastIndex)
         state = state.copy(items = items, currentIndex = index, queueId = queueId.takeIf { index >= 0 })
         playHistory.clear()
         shufflePlayed.clear()
         upNext.clear()
+        isCurrentItemAutoPicked = false
         if (index >= 0) {
             playHistory += index
             shufflePlayed += index
@@ -123,6 +127,7 @@ internal class QueueController(
     fun moveTo(index: Int): Boolean {
         if (index !in state.items.indices) return false
         upNext.clear()
+        isCurrentItemAutoPicked = false
         val item = state.items.getOrNull(index)
         advanceTo(index)
         if (item != null) {
@@ -198,6 +203,7 @@ internal class QueueController(
         val unplayed = state.items.indices - shufflePlayed
         if (state.shuffle && unplayed.isEmpty()) shufflePlayed.clear()
         val isExplicitUpNext = upNext.firstOrNull() == index
+        isCurrentItemAutoPicked = !isExplicitUpNext
         val item = state.items.getOrNull(index)
         advanceTo(index)
         if (!isExplicitUpNext && item != null) {
@@ -360,6 +366,7 @@ internal class QueueController(
         playHistory.clear()
         shufflePlayed.clear()
         upNext.clear()
+        isCurrentItemAutoPicked = false
     }
 
     private fun advanceTo(index: Int) {

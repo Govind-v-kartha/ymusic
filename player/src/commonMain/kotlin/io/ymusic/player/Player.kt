@@ -215,6 +215,13 @@ interface Player {
         get() = null
         set(_) {}
 
+    val isCurrentItemAutoPicked: Boolean
+        get() = false
+
+    var onTrackQuickSkipped: ((item: PlayableItem, isAutoPicked: Boolean) -> Unit)?
+        get() = null
+        set(_) {}
+
     fun configureRepeatPolicy(
         noRepeatHours: () -> Int,
         onFallbackNotice: (() -> Unit)? = null,
