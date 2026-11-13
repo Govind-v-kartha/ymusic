@@ -23,5 +23,7 @@ interface MixPolicy {
         currentIndex: Int,
     ): MixSelectionResult
 
+    fun getRecentPicksSummary(): String = ""
+
     fun clearHistory()
 }

@@ -75,6 +75,16 @@ object LanguageClassifier {
             }
         }
 
+        // Check Multi-Language Publishers / Labels (Weak = 1)
+        LanguageStarterData.WEAK_LABELS.forEach { (lang, labels) ->
+            labels.forEach { label ->
+                if (combined.contains(label)) {
+                    scores[lang] = (scores[lang] ?: 0) + 1
+                    collectedSignals += "Publisher '$label' ($lang)" to 1
+                }
+            }
+        }
+
         // Check Strong Vocabulary (Strong = 2)
         LanguageStarterData.STRONG_VOCABULARY.forEach { (lang, words) ->
             words.forEach { word ->

@@ -19,64 +19,78 @@ package io.ymusic.player.mix
  */
 object LanguageStarterData {
 
+    // Verified single-language exclusive channels/labels (STRONG = 2 points)
     val EXCLUSIVE_LABELS: Map<Language, List<String>> = mapOf(
         Language.MALAYALAM to listOf(
-            "muzik247",
+            "saregama malayalam",
+            "speed audio malayalam",
             "satyam audios",
             "satyam jukebox",
             "manorama music",
             "millennium audios",
-            "saregama malayalam",
             "saina music",
-            "speed audio malayalam",
             "mathrubhumi",
             "east coast",
             "goodwill entertainments",
         ),
         Language.TAMIL to listOf(
-            "think music india",
-            "sony music south",
             "saregama tamil",
-            "sun pictures",
-            "lyca productions",
             "lahari music tamil",
+            "sun pictures",
             "u1 records",
         ),
         Language.TELUGU to listOf(
-            "aditya music",
-            "madhura audio",
-            "lahari music",
             "saregama telugu",
             "t-series telugu",
+            "madhura audio",
+        ),
+        Language.HINDI to listOf(
+            "saregama hindi",
+        ),
+    )
+
+    // Multi-language publishers / labels (WEAK = 1 point)
+    val WEAK_LABELS: Map<Language, List<String>> = mapOf(
+        Language.MALAYALAM to listOf(
+            "muzik247",
+        ),
+        Language.TAMIL to listOf(
+            "think music india",
+            "sony music south",
+            "lahari music",
+            "lyca productions",
+        ),
+        Language.TELUGU to listOf(
+            "aditya music",
+            "lahari music",
         ),
         Language.HINDI to listOf(
             "t-series",
             "zee music company",
-            "yrf",
             "tips official",
             "sony music india",
+            "yrf",
         ),
     )
 
-    // Language-specific unique words (STRONG evidence). Song-specific title pieces removed.
+    // Language-specific unique words (STRONG evidence = 2 points)
     val STRONG_VOCABULARY: Map<Language, List<String>> = mapOf(
         Language.MALAYALAM to listOf(
             "njan", "njanum", "ningal", "ithu", "ivide", "entethu",
-            "ippol", "eppol", "enthaanu", "pakshe", "engane", "oru",
+            "ippol", "eppol", "enthaanu", "pakshe", "engane",
             "pennu", "cheru", "cheriya", "paattu", "gaanangal",
             "ormakal", "hridayam", "jeevitham", "snehamodu", "chundathu",
         ),
         Language.TAMIL to listOf(
-            "naan", "enna", "epdi", "inga", "unga", "avanga", "paatu",
-            "kaadhal", "kanmani", "varum", "serndhu", "vaazhkai",
+            "naan", "epdi", "inga", "unga", "avanga", "paatu",
+            "kaadhal", "kanmani", "serndhu", "vaazhkai",
         ),
         Language.TELUGU to listOf(
             "nenu", "ela", "ekkada", "meeru", "prema", "paata",
             "cheliya", "manasu", "kaadhu", "vasthe",
         ),
         Language.HINDI to listOf(
-            "mera", "meri", "hum", "tum", "aap", "dil", "pyaar",
-            "ishq", "zindagi", "tere", "tera", "kaha", "kyun",
+            "hum", "aap", "zindagi", "kaha", "kyun",
             "hona", "dhadkan", "mohabbat", "khuda",
         ),
     )
@@ -104,19 +118,24 @@ object LanguageStarterData {
         ),
     )
 
-    // Shared vocabulary across South Indian languages (WEAK evidence = 1 point)
+    // Shared vocabulary across languages / dialects (WEAK evidence = 1 point)
     val SHARED_VOCABULARY: Map<Language, List<String>> = mapOf(
         Language.MALAYALAM to listOf(
             "kalyanam", "neram", "uyire", "kannu", "mazha", "premam",
             "moham", "kanmani", "priyasakhi", "shantham", "vinnile",
             "theeram", "puzha", "kaathu", "thumbi", "kaattil", "thaamara",
+            "oru", "enna", "varum",
         ),
         Language.TAMIL to listOf(
             "kalyanam", "neram", "uyire", "kannu", "mazhai", "premam",
             "kanmani", "theeram", "kaathu", "thenral",
+            "oru", "enna", "varum",
         ),
         Language.TELUGU to listOf(
             "kalyanam", "neramu", "uyire", "kannu", "prema", "sneham",
+        ),
+        Language.HINDI to listOf(
+            "dil", "pyaar", "ishq", "tum", "tera", "mera", "meri", "tere",
         ),
     )
 

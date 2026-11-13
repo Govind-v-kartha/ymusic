@@ -2,60 +2,71 @@
   "STARTER_DATA_NOTE": "STARTER DATA for user review. Used for LanguageClassifier evidence scoring.",
   "exclusive_labels": {
     "MALAYALAM": [
-      "muzik247",
+      "saregama malayalam",
+      "speed audio malayalam",
       "satyam audios",
       "satyam jukebox",
       "manorama music",
       "millennium audios",
-      "saregama malayalam",
       "saina music",
-      "speed audio malayalam",
       "mathrubhumi",
       "east coast",
       "goodwill entertainments"
     ],
     "TAMIL": [
-      "think music india",
-      "sony music south",
       "saregama tamil",
-      "sun pictures",
-      "lyca productions",
       "lahari music tamil",
+      "sun pictures",
       "u1 records"
     ],
     "TELUGU": [
-      "aditya music",
-      "madhura audio",
-      "lahari music",
       "saregama telugu",
-      "t-series telugu"
+      "t-series telugu",
+      "madhura audio"
+    ],
+    "HINDI": [
+      "saregama hindi"
+    ]
+  },
+  "weak_labels": {
+    "MALAYALAM": [
+      "muzik247"
+    ],
+    "TAMIL": [
+      "think music india",
+      "sony music south",
+      "lahari music",
+      "lyca productions"
+    ],
+    "TELUGU": [
+      "aditya music",
+      "lahari music"
     ],
     "HINDI": [
       "t-series",
       "zee music company",
-      "yrf",
       "tips official",
-      "sony music india"
+      "sony music india",
+      "yrf"
     ]
   },
   "strong_vocabulary": {
     "MALAYALAM": [
       "njan", "njanum", "ningal", "ithu", "ivide", "entethu",
-      "ippol", "eppol", "enthaanu", "pakshe", "engane", "oru",
+      "ippol", "eppol", "enthaanu", "pakshe", "engane",
       "pennu", "cheru", "cheriya", "paattu", "gaanangal",
       "ormakal", "hridayam", "jeevitham", "snehamodu", "chundathu"
     ],
     "TAMIL": [
-      "naan", "enna", "epdi", "inga", "unga", "avanga", "paatu",
-      "kaadhal", "kanmani", "varum", "serndhu", "vaazhkai"
+      "naan", "epdi", "inga", "unga", "avanga", "paatu",
+      "kaadhal", "kanmani", "serndhu", "vaazhkai"
     ],
     "TELUGU": [
       "nenu", "ela", "ekkada", "meeru", "prema", "paata",
       "cheliya", "manasu", "kaadhu", "vasthe"
     ],
     "HINDI": [
-      "mera", "meri", "hum", "tum", "aap", "dil", "pyaar",
-      "ishq", "zindagi", "tere", "tera", "kaha", "kyun",
+      "hum", "aap", "zindagi", "kaha", "kyun",
       "hona", "dhadkan", "mohabbat", "khuda"
     ]
   },
@@ -84,14 +95,19 @@
     "MALAYALAM": [
       "kalyanam", "neram", "uyire", "kannu", "mazha", "premam",
       "moham", "kanmani", "priyasakhi", "shantham", "vinnile",
-      "theeram", "puzha", "kaathu", "thumbi", "kaattil", "thaamara"
+      "theeram", "puzha", "kaathu", "thumbi", "kaattil", "thaamara",
+      "oru", "enna", "varum"
     ],
     "TAMIL": [
       "kalyanam", "neram", "uyire", "kannu", "mazhai", "premam",
-      "kanmani", "theeram", "kaathu", "thenral"
+      "kanmani", "theeram", "kaathu", "thenral",
+      "oru", "enna", "varum"
     ],
     "TELUGU": [
       "kalyanam", "neramu", "uyire", "kannu", "prema", "sneham"
+    ],
+    "HINDI": [
+      "dil", "pyaar", "ishq", "tum", "tera", "mera", "meri", "tere"
     ]
   },
   "english_positive_words": [

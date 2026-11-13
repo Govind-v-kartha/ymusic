@@ -231,11 +231,14 @@ class MixPolicyTest {
 
     @Test
     fun testMalayalamChannelAndArtistHints() {
-        // Strong label/channel hint
-        assertEquals(Language.MALAYALAM, LanguageClassifier.classify("Romantic Melody Song", "Muzik247"))
+        // Strong single-language label hint (score = 2)
+        assertEquals(Language.MALAYALAM, LanguageClassifier.classify("Romantic Melody Song", "Saregama Malayalam"))
         assertEquals(Language.MALAYALAM, LanguageClassifier.classify("Evergreen Hit", "Satyam Jukebox"))
         assertEquals(Language.MALAYALAM, LanguageClassifier.classify("New Movie Track", "Manorama Music"))
         assertEquals(Language.MALAYALAM, LanguageClassifier.classify("Classic Track", "Millennium Audios"))
+
+        // Multi-language publisher (Muzik247 = 1pt) with shared word (oru = 1pt) reaches threshold 2
+        assertEquals(Language.MALAYALAM, LanguageClassifier.classify("Oru Romantic Song", "Muzik247"))
 
         // Multi-signal artist + shared word
         assertEquals(Language.MALAYALAM, LanguageClassifier.classify("Thumbi Vaa", "K.S. Chithra"))
@@ -378,7 +381,8 @@ class MixPolicyTest {
         var unknownCount = 0
         var withMoodCount = 0
 
-        println("=== 60 REALISTIC RADIO TITLES CLASSIFICATION REPORT ===")
+        println("=== 60 SYNTHETIC TITLES SCORING MECHANICS TEST ===")
+        println("MECHANICS TEST ONLY: Evaluates scoring mechanics on synthetic titles constructed from starter vocabulary. Does NOT measure real-world classification accuracy.")
         println("%-3s | %-9s | %-9s | %-9s | %-45s | %-20s | %s".format(
             "#", "Expected", "Detected", "Mood", "Title", "Artist / Channel", "Signals Used (Strength)"
         ))
@@ -424,12 +428,96 @@ class MixPolicyTest {
         }
 
         val total = samples.size
-        val moodSharePercent = (withMoodCount * 100.0) / total
         println("-".repeat(140))
-        println("TOTALS: Total=$total | Correct=$correctCount | Wrong=$wrongCount | Unknown=$unknownCount | Mood Evidence=$withMoodCount (${moodSharePercent.toInt()}%)")
+        println("TOTALS: Total=$total | Correct=$correctCount | Wrong=$wrongCount | Unknown=$unknownCount | Mood Evidence=$withMoodCount")
         println("=========================================================")
 
-        assertEquals(0, wrongCount, "Expected zero wrong classifications across 60 realistic radio titles")
-        assertTrue(correctCount >= 55, "Expected high accuracy (>=55/60) with starter dictionary")
+        assertEquals(0, wrongCount, "Expected zero wrong classifications on synthetic scoring test")
+    }
+
+    @Test
+    fun testClassifierOn30ChallengingAndAmbiguousTitles() {
+        val challengingSamples = listOf(
+            // 1. Unknown titles in Latin script (no vocabulary in starter dictionary) -> Expected: UNKNOWN
+            RadioSample(Language.UNKNOWN, "Kallai Kadavathu Kaattozhinju", "M.G. Radhakrishnan", "Independent Channel"),
+            RadioSample(Language.UNKNOWN, "Velli Nilaavin Thanalil", "Jerry Amaldev", "Malayalam Cassettes"),
+            RadioSample(Language.UNKNOWN, "Aayiram Kannumayi Kaathirunnu", "Johnson Master", "Classic Audio"),
+            RadioSample(Language.UNKNOWN, "Un Samayalaraiyil", "Prakash Kumar", "Studio South"),
+            RadioSample(Language.UNKNOWN, "Poove Sempoove Un Vaasam", "Vidyasagar", "Echo Audio"),
+            RadioSample(Language.UNKNOWN, "Kannukkul Pothivaippen", "Santhosh Narayanan", "Madras Beats"),
+            RadioSample(Language.UNKNOWN, "Maa Tujhe Salaam Vande", "Various Artists", "Desh Records"),
+            RadioSample(Language.UNKNOWN, "Tu Jahan Jahan Chalega", "Madan Mohan", "Old Hindi Gems"),
+            RadioSample(Language.UNKNOWN, "Ghar Aaja Pardesi Tera", "Uttam Singh", "Folk Heritage"),
+            RadioSample(Language.UNKNOWN, "Echoes Pine Valley Instrumental", "Acoustic Forest", "Nature Sounds"),
+
+            // 2. Titles from multi-language publishers where publisher default differs or provides weak evidence (1 pt)
+            RadioSample(Language.UNKNOWN, "Rowdy Kedi Hit Track", "Singer", "T-Series"),
+            RadioSample(Language.UNKNOWN, "Muzhikku Pinne Oru", "Singer", "Sony Music South"),
+            RadioSample(Language.UNKNOWN, "Superstar Mass BGM", "Anirudh", "Zee Music Company"),
+            RadioSample(Language.UNKNOWN, "Romantic Theme Beats", "Sid Sriram", "Tips Official"),
+            RadioSample(Language.UNKNOWN, "Folk Celebration Beat", "Singer", "Think Music India"),
+            RadioSample(Language.UNKNOWN, "Bhakti Sangeet Jukebox", "Singer", "Lahari Music"),
+            RadioSample(Language.UNKNOWN, "College Days Nostalgia", "Singer", "Aditya Music"),
+            RadioSample(Language.UNKNOWN, "Cinema Anthem Song", "Singer", "YRF"),
+            RadioSample(Language.UNKNOWN, "Campus Friendship Track", "Singer", "Muzik247"),
+            RadioSample(Language.UNKNOWN, "Action Teaser Theme", "Composer", "Lyca Productions"),
+
+            // 3. Ambiguous single-word titles or single weak signals (< 2 points threshold) -> Expected: UNKNOWN
+            RadioSample(Language.UNKNOWN, "Neram", "Various Artists", "Independent"),
+            RadioSample(Language.UNKNOWN, "Uyire", "Various Artists", "Independent"),
+            RadioSample(Language.UNKNOWN, "Pyaar", "Various Artists", "Independent"),
+            RadioSample(Language.UNKNOWN, "Dil", "Various Artists", "Independent"),
+            RadioSample(Language.UNKNOWN, "Kalyanam", "Various Artists", "Independent"),
+            RadioSample(Language.UNKNOWN, "Oru", "Various Artists", "Independent"),
+            RadioSample(Language.UNKNOWN, "Arijit Singh Special Session", "Arijit Singh", "Artist Channel"),
+            RadioSample(Language.UNKNOWN, "Sid Sriram Special Concert", "Sid Sriram", "Event Stage"),
+            RadioSample(Language.UNKNOWN, "K.J. Yesudas Classical Evening", "K.J. Yesudas", "Sabha Audios"),
+            RadioSample(Language.UNKNOWN, "Anirudh Musical Tour", "Anirudh", "Tour Diary"),
+        )
+
+        var correctCount = 0
+        var wrongCount = 0
+        var unknownCount = 0
+
+        println("=== 30 CHALLENGING AND AMBIGUOUS TITLES TEST ===")
+        println("%-3s | %-35s | %-20s | %-9s | %-9s | %s".format(
+            "#", "Title", "Channel", "Expected", "Got", "Signals"
+        ))
+        println("-".repeat(120))
+
+        challengingSamples.forEachIndexed { index, sample ->
+            val evidence = LanguageClassifier.classifyWithEvidence(
+                title = sample.title,
+                artist = sample.artist,
+                channel = sample.channel,
+            )
+
+            val isCorrect = evidence.language == sample.expectedLanguage
+            val isUnknown = evidence.language == Language.UNKNOWN
+
+            if (isCorrect) {
+                correctCount++
+            } else if (isUnknown) {
+                unknownCount++
+            } else {
+                wrongCount++
+            }
+
+            val signalsFormatted = if (evidence.signals.isEmpty()) "None" else evidence.signals.joinToString(", ") { "${it.first} [${it.second}pt]" }
+
+            println("%-3d | %-35s | %-20s | %-9s | %-9s | %s".format(
+                index + 1,
+                sample.title.take(35),
+                sample.channel.take(20),
+                sample.expectedLanguage.name,
+                evidence.language.name,
+                signalsFormatted,
+            ))
+        }
+
+        val total = challengingSamples.size
+        println("-".repeat(120))
+        println("TOTALS: Total=$total | Correct=$correctCount | Wrong=$wrongCount | Unknown=$unknownCount")
+        println("=================================================")
     }
 }

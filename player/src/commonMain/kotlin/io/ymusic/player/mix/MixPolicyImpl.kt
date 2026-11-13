@@ -192,6 +192,26 @@ class MixPolicyImpl(
 
         val selected = pickedInfo ?: pool.first()
         val stats = context.getWindowStats()
+
+        val evidence = LanguageClassifier.classifyWithEvidence(
+            selected.item.displayTitle,
+            selected.item.artistName,
+            artistStore = artistLanguageStore,
+            contextLanguage = targetLang,
+        )
+        val signalsFormatted = if (evidence.signals.isEmpty()) "none" else evidence.signals.joinToString(", ") { "${it.first}:${it.second}pt" }
+        val channelName = selected.item.artistName.orEmpty()
+
+        val autoPickLogLine = "[mix] auto-pick title='${selected.item.displayTitle}' channel='$channelName' lang=${selected.language} mood=${selected.mood} signals=[$signalsFormatted]"
+        logger?.fork("mix")?.log(Logger.Level.INFO, autoPickLogLine)
+
+        synchronized(recentPicks) {
+            if (recentPicks.size >= 20) {
+                recentPicks.removeFirst()
+            }
+            recentPicks.add(AutoPickRecord(selected.item.displayTitle, channelName, selected.language, selected.mood, signalsFormatted))
+        }
+
         val logLine = "[mix] picked '${selected.item.displayTitle}' lang=${selected.language} mood=${selected.mood} window=$stats target=80% relaxed=$relaxedStep"
 
         logger?.fork("mix")?.log(Logger.Level.INFO, logLine)
@@ -204,8 +224,33 @@ class MixPolicyImpl(
         )
     }
 
+    data class AutoPickRecord(
+        val title: String,
+        val channel: String,
+        val language: Language,
+        val mood: Mood,
+        val signals: String,
+    )
+
+    private val recentPicks = ArrayDeque<AutoPickRecord>()
+
+    override fun getRecentPicksSummary(): String {
+        return synchronized(recentPicks) {
+            if (recentPicks.isEmpty()) {
+                "No recent automatic picks"
+            } else {
+                recentPicks.joinToString("\n") { r ->
+                    "• '${r.title}' [channel='${r.channel}'] -> lang=${r.language}, mood=${r.mood}, signals=[${r.signals}]"
+                }
+            }
+        }
+    }
+
     override fun clearHistory() {
         context.clear()
         artistLanguageStore.clear()
+        synchronized(recentPicks) {
+            recentPicks.clear()
+        }
     }
 }
