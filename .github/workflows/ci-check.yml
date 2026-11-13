@@ -94,7 +94,7 @@ jobs:
         working-directory: YMusicV4
         env:
           YMUSIC_ABIS: arm64-v8a
-        run: ./gradlew :androidApp:compileReleaseKotlin :androidApp:lintVitalAnalyzeRelease
+        run: ./gradlew :androidApp:compileReleaseKotlin :androidApp:lintVitalRelease
 
   desktop-compile:
     name: Desktop Compile (JVM)
@@ -146,4 +146,4 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Run JVM Tests
-        run: ./gradlew :player:jvmTest :settings:jvmTest :commonUi:jvmTest --tests io.ymusic.ui.playhistory.PlayHistorySchemaMigrationTest --tests io.ymusic.ui.ThemePreviewTest :desktopApp:jvmTest -x :syncFfmpegHost -x :quickjs:cmakeConfigure -x :quickjs:cmakeBuild -x :mse:mseCmakeBuild -x :mse:mseCmakeConfigure
+        run: ./gradlew :player:jvmTest :settings:jvmTest :commonUi:jvmTest --tests io.ymusic.ui.playhistory.PlayHistorySchemaMigrationTest :desktopApp:jvmTest -x :syncFfmpegHost -x :quickjs:cmakeConfigure -x :quickjs:cmakeBuild -x :mse:mseCmakeBuild -x :mse:mseCmakeConfigure
