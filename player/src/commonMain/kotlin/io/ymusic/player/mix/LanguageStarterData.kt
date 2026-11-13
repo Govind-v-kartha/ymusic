@@ -120,12 +120,15 @@ object LanguageStarterData {
         ),
     )
 
-    // Positive words required for English classification
+    // Positive words required for English classification (excludes YouTube metadata boilerplate like official, video, lyrics, remix)
     val ENGLISH_POSITIVE_WORDS: List<String> = listOf(
         "the", "and", "you", "your", "with", "for", "from", "love", "night",
-        "heart", "baby", "girl", "boy", "world", "time", "life", "feat", "ft",
-        "live", "remix", "official", "video", "audio", "acoustic", "version",
-        "edit", "song", "track", "slowed", "lyrics", "cover", "like", "me",
+        "heart", "baby", "girl", "boy", "world", "time", "life", "like", "me",
+        "never", "always", "stay", "eyes", "dream", "feel", "say", "know", "see",
+        "think", "forever", "together", "light", "dark", "broken", "fire", "rain",
+        "dance", "tonight", "need", "hold", "away", "without", "someone", "somewhere",
+        "closer", "myself", "yourself", "beautiful", "memories", "perfect", "shape",
+        "new",
     )
 
     // Recognized Western / English artists
@@ -133,6 +136,8 @@ object LanguageStarterData {
         "ed sheeran", "the weeknd", "taylor swift", "drake", "adele",
         "coldplay", "billie eilish", "bruno mars", "justin bieber",
         "dua lipa", "eminem", "rihanna", "post malone", "shawn mendes",
-        "ellie goulding",
+        "ellie goulding", "maroon 5", "imagine dragons", "charlie puth",
+        "ariana grande", "sam smith", "olivia rodrigo", "harry styles",
+        "katy perry", "lady gaga", "sia", "alan walker",
     )
 }

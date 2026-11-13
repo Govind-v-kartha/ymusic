@@ -12,29 +12,54 @@ object LanguageClassifier {
         Regex("""(?i)\b(english)\b""") to Language.ENGLISH,
     )
 
+    data class EvidenceResult(
+        val language: Language,
+        val signals: List<Pair<String, Int>>,
+    )
+
     fun classify(
         title: String?,
         artist: String? = null,
         artistStore: LearnedArtistLanguageStore? = null,
         contextLanguage: Language? = null,
-    ): Language {
-        val combined = listOfNotNull(title, artist).joinToString(" ").lowercase()
-        if (combined.isBlank()) return contextLanguage ?: Language.UNKNOWN
+    ): Language = classifyWithEvidence(title, artist, null, artistStore, contextLanguage).language
+
+    fun classifyWithEvidence(
+        title: String?,
+        artist: String? = null,
+        channel: String? = null,
+        artistStore: LearnedArtistLanguageStore? = null,
+        contextLanguage: Language? = null,
+    ): EvidenceResult {
+        val combined = listOfNotNull(title, artist, channel).joinToString(" ").lowercase()
+        val collectedSignals = mutableListOf<Pair<String, Int>>()
+        if (combined.isBlank()) {
+            return EvidenceResult(contextLanguage ?: Language.UNKNOWN, collectedSignals)
+        }
 
         // 1. Direct Unicode Script Detection (highest priority - STRONG = 2)
         val scriptLang = detectScript(combined)
-        if (scriptLang != null) return scriptLang
+        if (scriptLang != null) {
+            collectedSignals += "Native script ($scriptLang)" to 2
+            return EvidenceResult(scriptLang, collectedSignals)
+        }
 
         // 2. Explicit Keyword tags (e.g. "[Malayalam Song]", "(Tamil Video)") - STRONG = 2
         for ((pattern, lang) in KEYWORD_PATTERNS) {
-            if (pattern.containsMatchIn(combined)) {
-                return lang
+            val match = pattern.find(combined)
+            if (match != null) {
+                collectedSignals += "Keyword tag '${match.value}' ($lang)" to 2
+                return EvidenceResult(lang, collectedSignals)
             }
         }
 
         // 3. Learned artist / channel dictionary (STRONG = 2 if decisive)
         if (artist != null && artistStore != null) {
-            artistStore.getDecisiveLanguage(artist)?.let { return it }
+            val learned = artistStore.getDecisiveLanguage(artist)
+            if (learned != null) {
+                collectedSignals += "Learned artist '$artist' ($learned)" to 2
+                return EvidenceResult(learned, collectedSignals)
+            }
         }
 
         // 4. Evidence scoring for Indic languages (Strong = 2, Weak = 1, Threshold >= 2)
@@ -42,61 +67,77 @@ object LanguageClassifier {
 
         // Check Exclusive Channels / Labels (Strong = 2)
         LanguageStarterData.EXCLUSIVE_LABELS.forEach { (lang, labels) ->
-            if (labels.any { combined.contains(it) }) {
-                scores[lang] = (scores[lang] ?: 0) + 2
+            labels.forEach { label ->
+                if (combined.contains(label)) {
+                    scores[lang] = (scores[lang] ?: 0) + 2
+                    collectedSignals += "Exclusive label '$label' ($lang)" to 2
+                }
             }
         }
 
         // Check Strong Vocabulary (Strong = 2)
         LanguageStarterData.STRONG_VOCABULARY.forEach { (lang, words) ->
-            if (words.any { word -> Regex("""\b${Regex.escape(word)}\b""").containsMatchIn(combined) }) {
-                scores[lang] = (scores[lang] ?: 0) + 2
+            words.forEach { word ->
+                if (Regex("""\b${Regex.escape(word)}\b""").containsMatchIn(combined)) {
+                    scores[lang] = (scores[lang] ?: 0) + 2
+                    collectedSignals += "Strong word '$word' ($lang)" to 2
+                }
             }
         }
 
         // Check Multilingual Artists (Weak = 1)
         LanguageStarterData.MULTILINGUAL_ARTISTS.forEach { (lang, artists) ->
-            if (artists.any { art -> combined.contains(art) }) {
-                scores[lang] = (scores[lang] ?: 0) + 1
+            artists.forEach { art ->
+                if (combined.contains(art)) {
+                    scores[lang] = (scores[lang] ?: 0) + 1
+                    collectedSignals += "Multilingual artist '$art' ($lang)" to 1
+                }
             }
         }
 
         // Check Shared Vocabulary (Weak = 1)
         LanguageStarterData.SHARED_VOCABULARY.forEach { (lang, words) ->
-            if (words.any { word -> Regex("""\b${Regex.escape(word)}\b""").containsMatchIn(combined) }) {
-                scores[lang] = (scores[lang] ?: 0) + 1
+            words.forEach { word ->
+                if (Regex("""\b${Regex.escape(word)}\b""").containsMatchIn(combined)) {
+                    scores[lang] = (scores[lang] ?: 0) + 1
+                    collectedSignals += "Shared word '$word' ($lang)" to 1
+                }
             }
         }
 
         // Best scoring Indic language with score >= 2 wins
         val bestIndic = scores.filter { it.value >= 2 }.maxByOrNull { it.value }?.key
         if (bestIndic != null) {
-            return bestIndic
+            return EvidenceResult(bestIndic, collectedSignals)
         }
 
         // If score is 1 (single weak signal) and contextLanguage matches that language:
         if (contextLanguage != null && (scores[contextLanguage] ?: 0) >= 1) {
-            return contextLanguage
+            collectedSignals += "Context match with weak signal ($contextLanguage)" to 1
+            return EvidenceResult(contextLanguage, collectedSignals)
         }
 
         // 5. Positive English Detection (words or recognized English artists):
-        val hasEnglishWord = LanguageStarterData.ENGLISH_POSITIVE_WORDS.any { word ->
+        val matchedEnglishWords = LanguageStarterData.ENGLISH_POSITIVE_WORDS.filter { word ->
             Regex("""\b${Regex.escape(word)}\b""").containsMatchIn(combined)
         }
-        val hasEnglishArtist = LanguageStarterData.ENGLISH_ARTISTS.any { art ->
+        val matchedEnglishArtists = LanguageStarterData.ENGLISH_ARTISTS.filter { art ->
             combined.contains(art)
         }
-        if (hasEnglishWord || hasEnglishArtist) {
-            return Language.ENGLISH
+        if (matchedEnglishWords.isNotEmpty() || matchedEnglishArtists.isNotEmpty()) {
+            matchedEnglishWords.forEach { collectedSignals += "English word '$it'" to 2 }
+            matchedEnglishArtists.forEach { collectedSignals += "English artist '$it'" to 2 }
+            return EvidenceResult(Language.ENGLISH, collectedSignals)
         }
 
         // 6. Inherit contextLanguage if available and non-unknown
         if (contextLanguage != null && contextLanguage != Language.UNKNOWN) {
-            return contextLanguage
+            collectedSignals += "Context inheritance ($contextLanguage)" to 0
+            return EvidenceResult(contextLanguage, collectedSignals)
         }
 
         // 7. Latin script with no evidence is UNKNOWN (NEVER default to English!)
-        return Language.UNKNOWN
+        return EvidenceResult(Language.UNKNOWN, collectedSignals)
     }
 
     fun detectScript(text: String): Language? {

@@ -293,4 +293,143 @@ class MixPolicyTest {
         // Item 1 is the calm melody matching target language + mood
         assertEquals(1, result.selectedIndex)
     }
+
+    data class RadioSample(
+        val expectedLanguage: Language,
+        val title: String,
+        val artist: String,
+        val channel: String,
+    )
+
+    @Test
+    fun testRadioClassifierEvidenceOn60RealisticTitles() {
+        val samples = listOf(
+            // 15 Malayalam realistic radio titles
+            RadioSample(Language.MALAYALAM, "Aalorungi Arangum Oru Paattu (Official Video)", "K.J. Yesudas", "Satyam Audios"),
+            RadioSample(Language.MALAYALAM, "Njanum Njanumentaalum (Lyric Video)", "Sushin Shyam", "Saina Music"),
+            RadioSample(Language.MALAYALAM, "Uyire Uyire Ente Jeevitham (Official Music Video)", "Sujatha Mohan", "Muzik247"),
+            RadioSample(Language.MALAYALAM, "Entethu Mathram Pennu (Official Video)", "Shaan Rahman", "Manorama Music"),
+            RadioSample(Language.MALAYALAM, "Mazha Thorum Neram (Official Video)", "K.J. Yesudas", "East Coast"),
+            RadioSample(Language.MALAYALAM, "Pookkalam Njan Oru (Lyric Video)", "K.S. Chithra", "Millennium Audios"),
+            RadioSample(Language.MALAYALAM, "Hridayam Ennum Ormakal (Official Video)", "Hesham Abdul Wahab", "Goodwill Entertainments"),
+            RadioSample(Language.MALAYALAM, "Snehamodu Ningal Ivide (Lyric Video)", "Vineeth Sreenivasan", "Mathrubhumi"),
+            RadioSample(Language.MALAYALAM, "Cheriya Cheru Gaanangal (Official Video)", "Job Kurian", "Saregama Malayalam"),
+            RadioSample(Language.MALAYALAM, "Ippol Eppol Enthaanu (Official Video)", "Deepak Dev", "Speed Audio Malayalam"),
+            RadioSample(Language.MALAYALAM, "Puzha Theeram Vinnile (Lyric Video)", "M. Jayachandran", "East Coast"),
+            RadioSample(Language.MALAYALAM, "Kalyanam Kazhicha Pennu (Official Video)", "Gopi Sundar", "Muzik247"),
+            RadioSample(Language.MALAYALAM, "Oru Paattu Paadam (Lyric Video)", "Unni Menon", "Satyam Jukebox"),
+            RadioSample(Language.MALAYALAM, "Moham Enna Jeevitham (Official Video)", "Madhu Balakrishnan", "Manorama Music"),
+            RadioSample(Language.MALAYALAM, "Neram Poyi Chundathu (Lyric Video)", "Bijibal", "Saina Music"),
+
+            // 15 Hindi realistic radio titles
+            RadioSample(Language.HINDI, "Tum Hi Ho (Official Video)", "Arijit Singh", "T-Series"),
+            RadioSample(Language.HINDI, "Dil Dhadkan Aur Pyaar (Lyric Video)", "Sonu Nigam", "Sony Music India"),
+            RadioSample(Language.HINDI, "Zindagi Tere Naam (Official Video)", "Shreya Ghoshal", "Zee Music Company"),
+            RadioSample(Language.HINDI, "Meri Mohabbat Mera Khuda (Lyric Video)", "Atif Aslam", "Tips Official"),
+            RadioSample(Language.HINDI, "Tera Ishq Bada Teekha (Official Video)", "Badshah", "T-Series"),
+            RadioSample(Language.HINDI, "Hum Tum Ek Kamre Mein (Lyric Video)", "KK", "YRF"),
+            RadioSample(Language.HINDI, "Aap Jaisa Koi Meri (Official Video)", "Neha Kakkar", "T-Series"),
+            RadioSample(Language.HINDI, "Kyun Kaha Tha Tune (Lyric Video)", "Pritam", "Sony Music India"),
+            RadioSample(Language.HINDI, "Hona Tha Pyaar (Official Video)", "Atif Aslam", "Tips Official"),
+            RadioSample(Language.HINDI, "Mera Dil Meri Jaan (Lyric Video)", "Vishal Mishra", "Zee Music Company"),
+            RadioSample(Language.HINDI, "Tere Bina Zindagi (Official Video)", "Arijit Singh", "T-Series"),
+            RadioSample(Language.HINDI, "Pyaar Kiya Toh Nibhana (Lyric Video)", "Sonu Nigam", "Tips Official"),
+            RadioSample(Language.HINDI, "Dil Ki Dhadkan Sun (Official Video)", "Shreya Ghoshal", "YRF"),
+            RadioSample(Language.HINDI, "Ishq Hai Mera (Lyric Video)", "KK", "Sony Music India"),
+            RadioSample(Language.HINDI, "Khuda Aur Mohabbat (Official Video)", "Arijit Singh", "T-Series"),
+
+            // 15 Tamil realistic radio titles
+            RadioSample(Language.TAMIL, "Kaadhal Kanmani Enna Panna (Official Video)", "Anirudh", "Sony Music South"),
+            RadioSample(Language.TAMIL, "Naan Epdi Solvaen (Lyric Video)", "Sid Sriram", "Think Music India"),
+            RadioSample(Language.TAMIL, "Inga Unga Vaazhkai (Official Video)", "Yuvan Shankar Raja", "U1 Records"),
+            RadioSample(Language.TAMIL, "Oru Paatu Serndhu Paadu (Lyric Video)", "Ilaiyaraaja", "Saregama Tamil"),
+            RadioSample(Language.TAMIL, "Avanga Varum Neram (Official Video)", "Harris Jayaraj", "Sun Pictures"),
+            RadioSample(Language.TAMIL, "Uyire Uyire Serndhu (Lyric Video)", "A.R. Rahman", "Sony Music South"),
+            RadioSample(Language.TAMIL, "Kalyanam Panna Aasai (Official Video)", "Dhanush", "Lyca Productions"),
+            RadioSample(Language.TAMIL, "Thenral Kaathu Veesum (Lyric Video)", "S.P. Balasubrahmanyam", "Saregama Tamil"),
+            RadioSample(Language.TAMIL, "Enna Solla Pogirai (Official Video)", "Harris Jayaraj", "Think Music India"),
+            RadioSample(Language.TAMIL, "Mazhai Varum Neram (Lyric Video)", "Sid Sriram", "Lahari Music Tamil"),
+            RadioSample(Language.TAMIL, "Kaadhal Oru Aagayam (Official Video)", "Anirudh", "Sony Music South"),
+            RadioSample(Language.TAMIL, "Naan Unnai Paartha (Lyric Video)", "Yuvan Shankar Raja", "U1 Records"),
+            RadioSample(Language.TAMIL, "Vaazhkai Oru Vaanam (Official Video)", "Ilaiyaraaja", "Saregama Tamil"),
+            RadioSample(Language.TAMIL, "Kannu Kulla Nikkira (Lyric Video)", "Dhanush", "Sun Pictures"),
+            RadioSample(Language.TAMIL, "Priya Sakhi Kaadhal (Official Video)", "A.R. Rahman", "Think Music India"),
+
+            // 15 English realistic radio titles
+            RadioSample(Language.ENGLISH, "Shape of You (Official Video)", "Ed Sheeran", "Ed Sheeran"),
+            RadioSample(Language.ENGLISH, "Blinding Lights (Official Music Video)", "The Weeknd", "TheWeekndVEVO"),
+            RadioSample(Language.ENGLISH, "Love Story (Taylor's Version) (Lyric Video)", "Taylor Swift", "TaylorSwiftVEVO"),
+            RadioSample(Language.ENGLISH, "Hold On (Official Video)", "Justin Bieber", "JustinBieberVEVO"),
+            RadioSample(Language.ENGLISH, "Someone Like You (Official Video)", "Adele", "AdeleVEVO"),
+            RadioSample(Language.ENGLISH, "Bad Guy (Official Music Video)", "Billie Eilish", "BillieEilishVEVO"),
+            RadioSample(Language.ENGLISH, "Fire on Fire (Official Video)", "Sam Smith", "SamSmithVEVO"),
+            RadioSample(Language.ENGLISH, "Stay With Me (Lyric Video)", "Sam Smith", "SamSmithVEVO"),
+            RadioSample(Language.ENGLISH, "Memories (Official Video)", "Maroon 5", "Maroon5VEVO"),
+            RadioSample(Language.ENGLISH, "Perfect (Official Music Video)", "Ed Sheeran", "Ed Sheeran"),
+            RadioSample(Language.ENGLISH, "Dance The Night (From Barbie The Album) (Official Video)", "Dua Lipa", "Dua Lipa"),
+            RadioSample(Language.ENGLISH, "Believer (Official Music Video)", "Imagine Dragons", "ImagineDragonsVEVO"),
+            RadioSample(Language.ENGLISH, "Closer (Lyric Video)", "The Chainsmokers", "ChainsmokersVEVO"),
+            RadioSample(Language.ENGLISH, "Beautiful Things (Official Video)", "Benson Boone", "Benson Boone"),
+            RadioSample(Language.ENGLISH, "Rain On Me (Official Music Video)", "Lady Gaga", "LadyGagaVEVO"),
+        )
+
+        var correctCount = 0
+        var wrongCount = 0
+        var unknownCount = 0
+        var withMoodCount = 0
+
+        println("=== 60 REALISTIC RADIO TITLES CLASSIFICATION REPORT ===")
+        println("%-3s | %-9s | %-9s | %-9s | %-45s | %-20s | %s".format(
+            "#", "Expected", "Detected", "Mood", "Title", "Artist / Channel", "Signals Used (Strength)"
+        ))
+        println("-".repeat(140))
+
+        samples.forEachIndexed { index, sample ->
+            val evidence = LanguageClassifier.classifyWithEvidence(
+                title = sample.title,
+                artist = sample.artist,
+                channel = sample.channel,
+            )
+            val detectedMood = io.ymusic.player.mix.MoodClassifier.classify(sample.title, sample.artist)
+
+            val isCorrect = evidence.language == sample.expectedLanguage
+            val isUnknown = evidence.language == Language.UNKNOWN
+            if (isCorrect) {
+                correctCount++
+            } else if (isUnknown) {
+                unknownCount++
+            } else {
+                wrongCount++
+            }
+
+            if (detectedMood != Mood.UNKNOWN) {
+                withMoodCount++
+            }
+
+            val signalsFormatted = if (evidence.signals.isEmpty()) {
+                "None"
+            } else {
+                evidence.signals.joinToString("; ") { "${it.first} [${it.second}pt]" }
+            }
+
+            println("%-3d | %-9s | %-9s | %-9s | %-45s | %-20s | %s".format(
+                index + 1,
+                sample.expectedLanguage.name,
+                evidence.language.name,
+                detectedMood.name,
+                sample.title.take(45),
+                "${sample.artist} / ${sample.channel}".take(20),
+                signalsFormatted,
+            ))
+        }
+
+        val total = samples.size
+        val moodSharePercent = (withMoodCount * 100.0) / total
+        println("-".repeat(140))
+        println("TOTALS: Total=$total | Correct=$correctCount | Wrong=$wrongCount | Unknown=$unknownCount | Mood Evidence=$withMoodCount (${moodSharePercent.toInt()}%)")
+        println("=========================================================")
+
+        assertEquals(0, wrongCount, "Expected zero wrong classifications across 60 realistic radio titles")
+        assertTrue(correctCount >= 55, "Expected high accuracy (>=55/60) with starter dictionary")
+    }
 }
