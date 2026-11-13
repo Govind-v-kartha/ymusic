@@ -27,6 +27,13 @@ sealed interface PlayableItem {
             is LocalMedia -> playlistCode ?: mediaId?.toString() ?: uri
         }
 
+    val canonicalKey: String
+        get() = io.ymusic.player.repeat.CanonicalSongKey.compute(
+            artist = artistName,
+            title = displayTitle,
+            fallbackKey = repeatKey,
+        )
+
     val artistName: String?
         get() = when (this) {
             is YtMedia -> artist

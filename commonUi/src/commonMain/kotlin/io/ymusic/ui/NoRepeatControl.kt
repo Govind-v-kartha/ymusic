@@ -39,9 +39,13 @@ import io.ymusic.ui.resources.settings_no_repeat_12h
 import io.ymusic.ui.resources.settings_no_repeat_1h
 import io.ymusic.ui.resources.settings_no_repeat_24h
 import io.ymusic.ui.resources.settings_no_repeat_2h
+import io.ymusic.ui.resources.settings_no_repeat_30d
 import io.ymusic.ui.resources.settings_no_repeat_3h
+import io.ymusic.ui.resources.settings_no_repeat_48h
 import io.ymusic.ui.resources.settings_no_repeat_4h
 import io.ymusic.ui.resources.settings_no_repeat_6h
+import io.ymusic.ui.resources.settings_no_repeat_7d
+import io.ymusic.ui.resources.settings_no_repeat_8h
 import io.ymusic.ui.resources.settings_no_repeat_hours
 import io.ymusic.ui.resources.settings_no_repeat_hours_helper
 import io.ymusic.ui.resources.settings_no_repeat_off
@@ -53,11 +57,12 @@ val NoRepeatOptions: List<Pair<Int, StringResource>> = listOf(
     0 to Res.string.settings_no_repeat_off,
     1 to Res.string.settings_no_repeat_1h,
     2 to Res.string.settings_no_repeat_2h,
-    3 to Res.string.settings_no_repeat_3h,
     4 to Res.string.settings_no_repeat_4h,
-    6 to Res.string.settings_no_repeat_6h,
-    12 to Res.string.settings_no_repeat_12h,
+    8 to Res.string.settings_no_repeat_8h,
     24 to Res.string.settings_no_repeat_24h,
+    48 to Res.string.settings_no_repeat_48h,
+    168 to Res.string.settings_no_repeat_7d,
+    720 to Res.string.settings_no_repeat_30d,
 )
 
 val RestOptions: List<Pair<Long, StringResource>> = listOf(

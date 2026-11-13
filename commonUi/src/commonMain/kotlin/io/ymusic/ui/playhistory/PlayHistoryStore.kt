@@ -272,52 +272,66 @@ class PlayHistoryStore(
         ) { bindLong(0, keep.toLong()) }
     }
 
-    suspend fun insertRepeatEvent(itemKey: String, playedAt: Long, weight: Double) {
+    suspend fun insertRepeatEvent(
+        itemKey: String,
+        canonicalKey: String? = null,
+        playedAt: Long,
+        weight: Double,
+    ) {
         if (itemKey.isBlank()) return
         withContext(io) {
             driver.execute(
                 null,
-                "INSERT INTO repeat_events (item_key, played_at, weight) VALUES (?, ?, ?)",
-                3,
+                "INSERT INTO repeat_events (item_key, played_at, weight, canonical_key) VALUES (?, ?, ?, ?)",
+                4,
             ) {
                 bindString(0, itemKey)
                 bindLong(1, playedAt)
                 bindDouble(2, weight)
+                bindString(3, canonicalKey)
             }
         }
     }
 
-    suspend fun insertRepeatRest(itemKey: String, playedAt: Long, restUntil: Long) {
+    suspend fun insertRepeatRest(
+        itemKey: String,
+        canonicalKey: String? = null,
+        playedAt: Long,
+        restUntil: Long,
+    ) {
         if (itemKey.isBlank()) return
         withContext(io) {
             driver.execute(
                 null,
-                "INSERT INTO repeat_events (item_key, played_at, weight, rest_until) VALUES (?, ?, 0.0, ?)",
-                3,
+                "INSERT INTO repeat_events (item_key, played_at, weight, rest_until, canonical_key) VALUES (?, ?, 0.0, ?, ?)",
+                4,
             ) {
                 bindString(0, itemKey)
                 bindLong(1, playedAt)
                 bindLong(2, restUntil)
+                bindString(3, canonicalKey)
             }
         }
     }
 
-    suspend fun clearRepeatRest(itemKey: String) {
+    suspend fun clearRepeatRest(itemKey: String, canonicalKey: String? = null) {
         if (itemKey.isBlank()) return
         withContext(io) {
             driver.execute(
                 null,
-                "DELETE FROM repeat_events WHERE item_key = ? AND weight = 0.0",
-                1,
+                "DELETE FROM repeat_events WHERE (item_key = ? OR (canonical_key IS NOT NULL AND canonical_key = ?)) AND weight = 0.0",
+                2,
             ) {
                 bindString(0, itemKey)
+                bindString(1, canonicalKey ?: itemKey)
             }
             driver.execute(
                 null,
-                "UPDATE repeat_events SET rest_until = NULL WHERE item_key = ? AND weight > 0.0",
-                1,
+                "UPDATE repeat_events SET rest_until = NULL WHERE (item_key = ? OR (canonical_key IS NOT NULL AND canonical_key = ?)) AND weight > 0.0",
+                2,
             ) {
                 bindString(0, itemKey)
+                bindString(1, canonicalKey ?: itemKey)
             }
         }
     }
@@ -326,7 +340,7 @@ class PlayHistoryStore(
         withContext(io) {
             driver.executeQuery(
                 null,
-                "SELECT item_key, played_at, weight, rest_until FROM repeat_events WHERE played_at >= ? OR (rest_until IS NOT NULL AND rest_until > ?) ORDER BY played_at ASC",
+                "SELECT item_key, played_at, weight, rest_until, canonical_key FROM repeat_events WHERE played_at >= ? OR (rest_until IS NOT NULL AND rest_until > ?) ORDER BY played_at ASC",
                 { cursor ->
                     val map = mutableMapOf<String, MutableList<RepeatEvent>>()
                     while (cursor.next().value) {
@@ -334,7 +348,12 @@ class PlayHistoryStore(
                         val playedAt = cursor.getLong(1)!!
                         val weight = cursor.getDouble(2)!!
                         val restUntil = cursor.getLong(3)
-                        map.getOrPut(key) { mutableListOf() }.add(RepeatEvent(playedAt, weight, restUntil))
+                        val canonicalKey = cursor.getString(4)
+                        val event = RepeatEvent(playedAt, weight, restUntil, canonicalKey)
+                        map.getOrPut(key) { mutableListOf() }.add(event)
+                        if (!canonicalKey.isNullOrBlank() && canonicalKey != key) {
+                            map.getOrPut(canonicalKey) { mutableListOf() }.add(event)
+                        }
                     }
                     QueryResult.Value(map)
                 },
@@ -344,6 +363,26 @@ class PlayHistoryStore(
                 bindLong(1, nowMs)
             }.value
         }
+
+    suspend fun loadRecentPlayedKeys(limit: Int = 50): List<String> = withContext(io) {
+        driver.executeQuery(
+            null,
+            "SELECT item_key, canonical_key FROM repeat_events WHERE weight > 0.0 ORDER BY played_at DESC LIMIT ?",
+            { cursor ->
+                val list = mutableListOf<String>()
+                while (cursor.next().value) {
+                    val key = cursor.getString(0)
+                    val canonicalKey = cursor.getString(1)
+                    if (!key.isNullOrBlank()) list.add(key)
+                    if (!canonicalKey.isNullOrBlank()) list.add(canonicalKey)
+                }
+                QueryResult.Value(list)
+            },
+            1,
+        ) {
+            bindLong(0, limit.toLong())
+        }.value
+    }
 
     suspend fun pruneRepeatEvents(olderThanMs: Long, nowMs: Long = now()) {
         withContext(io) {

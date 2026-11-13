@@ -301,17 +301,18 @@ class PlaybackCoordinator(
     private fun recordRepeatEvent(item: PlayableItem, weight: Double) {
         scope.launch {
             val key = repeatKeyForItem(item) ?: return@launch
-            recordRepeatEvent(key, weight)
+            val canonicalKey = item.canonicalKey
+            recordRepeatEvent(key, canonicalKey, weight)
         }
     }
 
-    private fun recordRepeatEvent(key: String, weight: Double) {
+    private fun recordRepeatEvent(key: String, canonicalKey: String?, weight: Double) {
         val now = Clock.System.now().toEpochMilliseconds()
-        graph.player.repeatPolicy?.recordEvent(key, now, weight)
+        graph.player.repeatPolicy?.recordEvent(key, canonicalKey, now, weight)
         val history = playHistory ?: return
         scope.launch {
             try {
-                history.insertRepeatEvent(key, now, weight)
+                history.insertRepeatEvent(key, now, weight, canonicalKey)
             } catch (c: kotlinx.coroutines.CancellationException) {
                 throw c
             } catch (e: Exception) {
@@ -322,6 +323,7 @@ class PlaybackCoordinator(
 
     fun restItem(item: PlayableItem, durationMs: Long) {
         val key = item.repeatKey
+        val canonicalKey = item.canonicalKey
         if (key.isBlank()) return
         val now = Clock.System.now().toEpochMilliseconds()
         val restUntil = now + durationMs
@@ -329,7 +331,7 @@ class PlaybackCoordinator(
         val history = playHistory ?: return
         scope.launch {
             try {
-                history.insertRepeatRest(key, now, restUntil)
+                history.insertRepeatRest(key, now, restUntil, canonicalKey)
             } catch (c: kotlinx.coroutines.CancellationException) {
                 throw c
             } catch (e: Exception) {
@@ -338,13 +340,16 @@ class PlaybackCoordinator(
         }
     }
 
-    fun clearRepeatRest(key: String) {
+    fun clearRepeatRest(key: String, canonicalKey: String? = null) {
         if (key.isBlank()) return
-        graph.player.repeatPolicy?.clearRest(key)
+        graph.player.repeatPolicy?.clearRest(key, canonicalKey)
         val history = playHistory ?: return
         scope.launch {
             try {
                 history.clearRepeatRest(key)
+                if (!canonicalKey.isNullOrBlank() && canonicalKey != key) {
+                    history.clearRepeatRest(canonicalKey)
+                }
             } catch (c: kotlinx.coroutines.CancellationException) {
                 throw c
             } catch (e: Exception) {
@@ -356,10 +361,11 @@ class PlaybackCoordinator(
     private fun checkManualReplay(item: PlayableItem) {
         scope.launch {
             val key = repeatKeyForItem(item) ?: return@launch
-            clearRepeatRest(key)
+            val canonicalKey = item.canonicalKey
+            clearRepeatRest(key, canonicalKey)
             val now = Clock.System.now().toEpochMilliseconds()
-            if (graph.player.repeatPolicy?.hasEventInWindow(key, RepeatConfig.HISTORY_WINDOW_MS, now) == true) {
-                recordRepeatEvent(key, RepeatConfig.WEIGHT_REPLAY_OR_SEARCH)
+            if (graph.player.repeatPolicy?.hasEventInWindow(key, canonicalKey, RepeatConfig.HISTORY_WINDOW_MS, now) == true) {
+                recordRepeatEvent(key, canonicalKey, RepeatConfig.WEIGHT_REPLAY_OR_SEARCH)
             }
         }
     }

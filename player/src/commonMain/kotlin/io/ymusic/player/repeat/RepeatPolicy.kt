@@ -11,21 +11,29 @@ interface RepeatPolicy {
 
     /** Records a play/rewind/manual-replay event immediately into the in-memory snapshot. */
     fun recordEvent(key: String, playedAt: Long, weight: Double)
+    fun recordEvent(key: String, canonicalKey: String?, playedAt: Long, weight: Double) = recordEvent(key, playedAt, weight)
 
-    /** Records that [key] was played automatically, pushing it into the recent plays ring buffer. */
+    /** Records that [key] was played automatically, pushing it into the recent plays ring buffer and session. */
     fun recordAutoPlay(key: String)
+    fun recordAutoPlay(key: String, canonicalKey: String?) = recordAutoPlay(key)
+
+    /** Preloads recent played keys from database on startup to activate repetition defense immediately. */
+    fun preloadRecentPlays(keys: List<String>) {}
 
     /** Returns true if [key] has any recorded event in the past [windowMs] before [now]. */
     fun hasEventInWindow(key: String, windowMs: Long, now: Long): Boolean
+    fun hasEventInWindow(key: String, canonicalKey: String?, windowMs: Long, now: Long): Boolean = hasEventInWindow(key, windowMs, now)
 
     /** Sets a rest-until timestamp for [key]. */
     fun restItem(key: String, restUntil: Long)
 
     /** Clears active rest for [key], nulling restUntil without deleting play history. */
     fun clearRest(key: String)
+    fun clearRest(key: String, canonicalKey: String?) = clearRest(key)
 
     /** Returns true if [key] is currently rested at [now]. */
     fun isRested(key: String, now: Long): Boolean
+    fun isRested(key: String, canonicalKey: String?, now: Long): Boolean = isRested(key, now)
 
     /** Returns the active rest timestamp for [key] if any and not expired at [now]. */
     fun restUntil(key: String, now: Long): Long?

@@ -17,11 +17,13 @@ class RepeatPolicyImpl(
     private val snapshot = mutableMapOf<String, MutableList<RepeatEvent>>()
     private val restedUntil = mutableMapOf<String, Long>()
     private val recentAutoPlays = ArrayDeque<String>(RepeatConfig.RECENT_BUFFER_CAPACITY)
+    private val sessionKeys = mutableSetOf<String>()
+    private var lastPlaybackTimeMs: Long = 0L
     private var pendingClear: Boolean = false
 
     override val hasHistory: Boolean
         get() = synchronized(lock) {
-            snapshot.isNotEmpty() || restedUntil.isNotEmpty() || recentAutoPlays.isNotEmpty()
+            snapshot.isNotEmpty() || restedUntil.isNotEmpty() || recentAutoPlays.isNotEmpty() || sessionKeys.isNotEmpty()
         }
 
     override fun initSnapshot(snapshot: Map<String, List<RepeatEvent>>) {
@@ -47,8 +49,21 @@ class RepeatPolicyImpl(
             snapshot.clear()
             restedUntil.clear()
             recentAutoPlays.clear()
+            sessionKeys.clear()
+            lastPlaybackTimeMs = 0L
             if (!isReady) {
                 pendingClear = true
+            }
+        }
+    }
+
+    override fun preloadRecentPlays(keys: List<String>) {
+        synchronized(lock) {
+            for (k in keys) {
+                if (k.isNotBlank()) {
+                    sessionKeys.add(k)
+                    pushRecentPlay(k)
+                }
             }
         }
     }
@@ -60,29 +75,58 @@ class RepeatPolicyImpl(
         }
     }
 
+    fun restItem(key: String, canonicalKey: String?, restUntil: Long) {
+        if (key.isBlank()) return
+        synchronized(lock) {
+            this.restedUntil[key] = restUntil
+            if (!canonicalKey.isNullOrBlank()) {
+                this.restedUntil[canonicalKey] = restUntil
+            }
+        }
+    }
+
     override fun clearRest(key: String) {
+        clearRest(key, null)
+    }
+
+    override fun clearRest(key: String, canonicalKey: String?) {
         if (key.isBlank()) return
         synchronized(lock) {
             this.restedUntil.remove(key)
-            snapshot[key]?.let { list ->
-                list.removeAll { it.weight == 0.0 }
-                for (i in list.indices) {
-                    val e = list[i]
-                    if (e.restUntil != null) {
-                        list[i] = e.copy(restUntil = null)
+            if (!canonicalKey.isNullOrBlank()) {
+                this.restedUntil.remove(canonicalKey)
+            }
+            listOfNotNull(key, canonicalKey).forEach { k ->
+                snapshot[k]?.let { list ->
+                    list.removeAll { it.weight == 0.0 }
+                    for (i in list.indices) {
+                        val e = list[i]
+                        if (e.restUntil != null) {
+                            list[i] = e.copy(restUntil = null)
+                        }
                     }
                 }
             }
         }
     }
 
-    override fun isRested(key: String, now: Long): Boolean {
+    override fun isRested(key: String, now: Long): Boolean = isRested(key, null, now)
+
+    override fun isRested(key: String, canonicalKey: String?, now: Long): Boolean {
         synchronized(lock) {
-            val until = restedUntil[key] ?: return false
+            val until1 = restedUntil[key]
+            val until2 = canonicalKey?.let { restedUntil[it] }
+            val until = when {
+                until1 != null && until2 != null -> maxOf(until1, until2)
+                until1 != null -> until1
+                else -> until2
+            } ?: return false
+
             return if (until > now) {
                 true
             } else {
                 restedUntil.remove(key)
+                if (canonicalKey != null) restedUntil.remove(canonicalKey)
                 false
             }
         }
@@ -101,27 +145,76 @@ class RepeatPolicyImpl(
     }
 
     override fun recordEvent(key: String, playedAt: Long, weight: Double) {
+        recordEvent(key, null, playedAt, weight)
+    }
+
+    override fun recordEvent(key: String, canonicalKey: String?, playedAt: Long, weight: Double) {
         synchronized(lock) {
-            val list = snapshot.getOrPut(key) { mutableListOf() }
-            list.add(RepeatEvent(playedAt, weight))
+            val event = RepeatEvent(playedAt, weight, null, canonicalKey)
+            snapshot.getOrPut(key) { mutableListOf() }.add(event)
+            if (!canonicalKey.isNullOrBlank() && canonicalKey != key) {
+                snapshot.getOrPut(canonicalKey) { mutableListOf() }.add(event)
+            }
         }
     }
 
     override fun recordAutoPlay(key: String) {
+        recordAutoPlay(key, null)
+    }
+
+    override fun recordAutoPlay(key: String, canonicalKey: String?) {
         synchronized(lock) {
-            if (recentAutoPlays.size >= RepeatConfig.RECENT_BUFFER_CAPACITY) {
-                recentAutoPlays.removeFirst()
+            pushRecentPlay(key)
+            sessionKeys.add(key)
+            if (!canonicalKey.isNullOrBlank() && canonicalKey != key) {
+                pushRecentPlay(canonicalKey)
+                sessionKeys.add(canonicalKey)
             }
-            recentAutoPlays.addLast(key)
         }
     }
 
-    override fun hasEventInWindow(key: String, windowMs: Long, now: Long): Boolean {
-        synchronized(lock) {
-            val events = snapshot[key] ?: return false
-            val minTime = now - windowMs
-            return events.any { it.playedAt >= minTime && it.weight > 0.0 }
+    private fun pushRecentPlay(key: String) {
+        if (recentAutoPlays.size >= RepeatConfig.RECENT_BUFFER_CAPACITY) {
+            recentAutoPlays.removeFirst()
         }
+        recentAutoPlays.addLast(key)
+    }
+
+    override fun hasEventInWindow(key: String, windowMs: Long, now: Long): Boolean =
+        hasEventInWindow(key, null, windowMs, now)
+
+    override fun hasEventInWindow(key: String, canonicalKey: String?, windowMs: Long, now: Long): Boolean {
+        synchronized(lock) {
+            val minTime = now - windowMs
+            val ev1 = snapshot[key]
+            if (ev1?.any { it.playedAt >= minTime && it.weight > 0.0 } == true) return true
+            if (!canonicalKey.isNullOrBlank() && canonicalKey != key) {
+                val ev2 = snapshot[canonicalKey]
+                if (ev2?.any { it.playedAt >= minTime && it.weight > 0.0 } == true) return true
+            }
+            return false
+        }
+    }
+
+    private fun checkSessionReset(now: Long) {
+        if (lastPlaybackTimeMs > 0L && (now - lastPlaybackTimeMs) > RepeatConfig.SESSION_IDLE_TIMEOUT_MS) {
+            sessionKeys.clear()
+        }
+        lastPlaybackTimeMs = now
+    }
+
+    private fun isInSession(key: String, canonicalKey: String?): Boolean {
+        if (key in sessionKeys) return true
+        if (canonicalKey != null && canonicalKey in sessionKeys) return true
+        return false
+    }
+
+    private fun isInGap(key: String, canonicalKey: String?, minGap: Int): Boolean {
+        if (minGap <= 0 || recentAutoPlays.isEmpty()) return false
+        val gap = recentAutoPlays.takeLast(minGap).toSet()
+        if (key in gap) return true
+        if (canonicalKey != null && canonicalKey in gap) return true
+        return false
     }
 
     override fun selectNextIndex(
@@ -141,13 +234,17 @@ class RepeatPolicyImpl(
 
         var fallbackTriggered = false
         val selected = synchronized(lock) {
-            // Level 0: Full policy (minGap = 10, fatigue active, artist penalty active)
+            checkSessionReset(now)
+
+            // Level 0: Full policy (Session check active, minGap = 10, Window fatigue active, Rotation & Artist penalty active)
             evaluateLadder(
                 candidates = candidates,
                 items = items,
                 minGap = RepeatConfig.MIN_GAP,
+                checkSession = true,
                 checkFatigue = noRepeatHours > 0,
                 tauHours = noRepeatHours,
+                applyRotationPenalty = true,
                 applyArtistPenalty = true,
                 currentArtist = currentArtist,
                 allowScoreReordering = allowScoreReordering,
@@ -155,13 +252,15 @@ class RepeatPolicyImpl(
                 now = now,
             )?.let { return@synchronized it }
 
-            // Level 1: Drop artist penalty
+            // Step 1: Relax rotation penalty and artist penalty (minGap = 5)
             evaluateLadder(
                 candidates = candidates,
                 items = items,
-                minGap = RepeatConfig.MIN_GAP,
+                minGap = RepeatConfig.MIN_GAP_RELAXED,
+                checkSession = true,
                 checkFatigue = noRepeatHours > 0,
                 tauHours = noRepeatHours,
+                applyRotationPenalty = false,
                 applyArtistPenalty = false,
                 currentArtist = currentArtist,
                 allowScoreReordering = allowScoreReordering,
@@ -169,64 +268,66 @@ class RepeatPolicyImpl(
                 now = now,
             )?.let { return@synchronized it }
 
-            // Level 2: Drop scoring to plain order (no score reordering even in shuffle)
-            evaluateLadder(
-                candidates = candidates,
-                items = items,
-                minGap = RepeatConfig.MIN_GAP,
-                checkFatigue = noRepeatHours > 0,
-                tauHours = noRepeatHours,
-                applyArtistPenalty = false,
-                currentArtist = currentArtist,
-                allowScoreReordering = false,
-                isExempt = isExempt,
-                now = now,
-            )?.let { return@synchronized it }
-
-            // Level 3: Reduce minGap to 5
-            evaluateLadder(
-                candidates = candidates,
-                items = items,
-                minGap = RepeatConfig.MIN_GAP_RELAXED,
-                checkFatigue = noRepeatHours > 0,
-                tauHours = noRepeatHours,
-                applyArtistPenalty = false,
-                currentArtist = currentArtist,
-                allowScoreReordering = false,
-                isExempt = isExempt,
-                now = now,
-            )?.let { return@synchronized it }
-
-            // Level 4: Ignore hours window (fatigue disabled, minGap relaxed)
-            evaluateLadder(
-                candidates = candidates,
-                items = items,
-                minGap = RepeatConfig.MIN_GAP_RELAXED,
-                checkFatigue = false,
-                tauHours = 0,
-                applyArtistPenalty = false,
-                currentArtist = currentArtist,
-                allowScoreReordering = false,
-                isExempt = isExempt,
-                now = now,
-            )?.let {
-                fallbackTriggered = true
-                return@synchronized it
+            // Step 2: Halve window iteratively (48h -> 24h -> 12h -> 6h -> 1h). Session check remains ACTIVE.
+            if (noRepeatHours > 0) {
+                var halvedTau = noRepeatHours / 2
+                while (halvedTau >= 1) {
+                    evaluateLadder(
+                        candidates = candidates,
+                        items = items,
+                        minGap = 0,
+                        checkSession = true,
+                        checkFatigue = true,
+                        tauHours = halvedTau,
+                        applyRotationPenalty = false,
+                        applyArtistPenalty = false,
+                        currentArtist = currentArtist,
+                        allowScoreReordering = allowScoreReordering,
+                        isExempt = isExempt,
+                        now = now,
+                    )?.let { return@synchronized it }
+                    halvedTau /= 2
+                }
             }
 
-            // Level 5: When nothing else is eligible (never stall playback)
+            // Step 3: Drop window (tauHours = 0, no fatigue check), but session check remains ACTIVE (minGap = 0)
+            evaluateLadder(
+                candidates = candidates,
+                items = items,
+                minGap = 0,
+                checkSession = true,
+                checkFatigue = false,
+                tauHours = 0,
+                applyRotationPenalty = false,
+                applyArtistPenalty = false,
+                currentArtist = currentArtist,
+                allowScoreReordering = allowScoreReordering,
+                isExempt = isExempt,
+                now = now,
+            )?.let { return@synchronized it }
+
+            // Step 4: Drop session check as well; pick oldest played track among non-rested (or earliest rest expiry if all rested)
             fallbackTriggered = true
-            val nonRested = candidates.filterNot { isRested(items[it].repeatKey, now) }
+            val nonRested = candidates.filterNot { isRested(items[it].repeatKey, items[it].canonicalKey, now) }
             if (nonRested.isNotEmpty()) {
                 nonRested.minByOrNull { idx ->
-                    val key = items[idx].repeatKey
-                    val events = snapshot[key]
-                    events?.filter { it.weight > 0.0 }?.maxOfOrNull { it.playedAt } ?: Long.MIN_VALUE
+                    val item = items[idx]
+                    val events1 = snapshot[item.repeatKey]
+                    val events2 = snapshot[item.canonicalKey]
+                    val lastPlayed1 = events1?.filter { it.weight > 0.0 }?.maxOfOrNull { it.playedAt } ?: Long.MIN_VALUE
+                    val lastPlayed2 = events2?.filter { it.weight > 0.0 }?.maxOfOrNull { it.playedAt } ?: Long.MIN_VALUE
+                    maxOf(lastPlayed1, lastPlayed2)
                 } ?: nonRested.first()
             } else {
                 candidates.minByOrNull { idx ->
-                    val key = items[idx].repeatKey
-                    restedUntil[key] ?: Long.MAX_VALUE
+                    val item = items[idx]
+                    val u1 = restedUntil[item.repeatKey]
+                    val u2 = restedUntil[item.canonicalKey]
+                    when {
+                        u1 != null && u2 != null -> maxOf(u1, u2)
+                        u1 != null -> u1
+                        else -> u2 ?: Long.MAX_VALUE
+                    }
                 } ?: candidates.first()
             }
         }
@@ -250,44 +351,48 @@ class RepeatPolicyImpl(
 
         var fallbackTriggered = false
         val eligible = synchronized(lock) {
-            fun gapSet(minGap: Int): Set<String> =
-                if (minGap > 0 && recentAutoPlays.isNotEmpty()) {
-                    recentAutoPlays.takeLast(minGap).toSet()
-                } else {
-                    emptySet()
-                }
+            checkSessionReset(now)
 
-            fun isCandidateEligible(idx: Int, minGap: Int, checkFatigue: Boolean): Boolean {
+            fun isCandidateEligible(idx: Int, minGap: Int, checkSession: Boolean, checkFatigue: Boolean, tauHours: Int): Boolean {
                 val itm = items.getOrNull(idx) ?: return false
                 if (isExempt(itm)) return true
                 val key = itm.repeatKey
-                if (isRested(key, now)) return false
-                if (key in gapSet(minGap)) return false
-                if (checkFatigue && noRepeatHours > 0) {
-                    val fatigue = calculateFatigue(key, now, noRepeatHours)
+                val canonicalKey = itm.canonicalKey
+                if (isRested(key, canonicalKey, now)) return false
+                if (checkSession && isInSession(key, canonicalKey)) return false
+                if (isInGap(key, canonicalKey, minGap)) return false
+                if (checkFatigue && tauHours > 0) {
+                    val fatigue = calculateFatigue(key, canonicalKey, now, tauHours)
                     if (fatigue >= RepeatConfig.FATIGUE_THRESHOLD) return false
                 }
                 return true
             }
 
-            // Level 0: minGap = 10, checkFatigue = true
-            val l0 = candidates.filter { isCandidateEligible(it, RepeatConfig.MIN_GAP, checkFatigue = true) }
+            // Level 0: minGap = 10, checkSession = true, checkFatigue = true
+            val l0 = candidates.filter { isCandidateEligible(it, RepeatConfig.MIN_GAP, checkSession = true, checkFatigue = noRepeatHours > 0, tauHours = noRepeatHours) }
             if (l0.isNotEmpty()) return@synchronized l0
 
-            // Level 3: minGap = 5, checkFatigue = true
-            val l3 = candidates.filter { isCandidateEligible(it, RepeatConfig.MIN_GAP_RELAXED, checkFatigue = true) }
-            if (l3.isNotEmpty()) return@synchronized l3
+            // Step 1: minGap = 5, checkSession = true, checkFatigue = true
+            val l1 = candidates.filter { isCandidateEligible(it, RepeatConfig.MIN_GAP_RELAXED, checkSession = true, checkFatigue = noRepeatHours > 0, tauHours = noRepeatHours) }
+            if (l1.isNotEmpty()) return@synchronized l1
 
-            // Level 4: fatigue disabled, minGap = 5
-            val l4 = candidates.filter { isCandidateEligible(it, RepeatConfig.MIN_GAP_RELAXED, checkFatigue = false) }
-            if (l4.isNotEmpty()) {
-                fallbackTriggered = true
-                return@synchronized l4
+            // Step 2: Halve window iteratively (checkSession = true)
+            if (noRepeatHours > 0) {
+                var halvedTau = noRepeatHours / 2
+                while (halvedTau >= 1) {
+                    val l2 = candidates.filter { isCandidateEligible(it, 0, checkSession = true, checkFatigue = true, tauHours = halvedTau) }
+                    if (l2.isNotEmpty()) return@synchronized l2
+                    halvedTau /= 2
+                }
             }
 
-            // Level 5: non-rested or all
+            // Step 3: Drop window (tau = 0, no fatigue check), checkSession = true
+            val l3 = candidates.filter { isCandidateEligible(it, 0, checkSession = true, checkFatigue = false, tauHours = 0) }
+            if (l3.isNotEmpty()) return@synchronized l3
+
+            // Step 4: Drop session check as well
             fallbackTriggered = true
-            val nonRested = candidates.filterNot { isRested(items[it].repeatKey, now) }
+            val nonRested = candidates.filterNot { isRested(items[it].repeatKey, items[it].canonicalKey, now) }
             if (nonRested.isNotEmpty()) nonRested else candidates
         }
 
@@ -301,20 +406,16 @@ class RepeatPolicyImpl(
         candidates: List<Int>,
         items: List<PlayableItem>,
         minGap: Int,
+        checkSession: Boolean,
         checkFatigue: Boolean,
         tauHours: Int,
+        applyRotationPenalty: Boolean,
         applyArtistPenalty: Boolean,
         currentArtist: String?,
         allowScoreReordering: Boolean,
         isExempt: (PlayableItem) -> Boolean,
         now: Long,
     ): Int? {
-        val recentGapSet = if (minGap > 0 && recentAutoPlays.isNotEmpty()) {
-            recentAutoPlays.takeLast(minGap).toSet()
-        } else {
-            emptySet()
-        }
-
         val eligible = mutableListOf<CandidateScored>()
 
         for (idx in candidates) {
@@ -324,10 +425,12 @@ class RepeatPolicyImpl(
             }
 
             val key = item.repeatKey
-            if (isRested(key, now)) continue
-            if (key in recentGapSet) continue
+            val canonicalKey = item.canonicalKey
+            if (isRested(key, canonicalKey, now)) continue
+            if (checkSession && isInSession(key, canonicalKey)) continue
+            if (isInGap(key, canonicalKey, minGap)) continue
 
-            val fatigue = if (checkFatigue && tauHours > 0) calculateFatigue(key, now, tauHours) else 0.0
+            val fatigue = if (checkFatigue && tauHours > 0) calculateFatigue(key, canonicalKey, now, tauHours) else 0.0
             if (checkFatigue && fatigue >= RepeatConfig.FATIGUE_THRESHOLD) continue
 
             if (!allowScoreReordering) {
@@ -335,7 +438,8 @@ class RepeatPolicyImpl(
                 return idx
             }
 
-            val affinity = calculateAffinity(key)
+            val affinity = calculateAffinity(key, canonicalKey)
+            val rotationPenalty = if (applyRotationPenalty) calculateRotationPenalty(key, canonicalKey, now) else 0.0
             val artistPenalty = if (applyArtistPenalty && !currentArtist.isNullOrEmpty()) {
                 val candidateArtist = item.artistName?.trim()
                 if (!candidateArtist.isNullOrEmpty() && candidateArtist.equals(currentArtist, ignoreCase = true)) {
@@ -348,7 +452,7 @@ class RepeatPolicyImpl(
             }
 
             val jitter = random.nextDouble(0.0, RepeatConfig.JITTER_MAX)
-            val score = affinity.coerceIn(0.0, 1.0) - (1.5 * fatigue) - artistPenalty + jitter
+            val score = affinity.coerceIn(0.0, 1.0) - (1.5 * fatigue) - rotationPenalty - artistPenalty + jitter
 
             eligible.add(CandidateScored(idx, score))
         }
@@ -356,7 +460,19 @@ class RepeatPolicyImpl(
         return eligible.maxByOrNull { it.score }?.index
     }
 
-    internal fun calculateFatigue(key: String, now: Long, tauHours: Int): Double {
+    internal fun calculateFatigue(key: String, now: Long, tauHours: Int): Double =
+        calculateFatigue(key, null, now, tauHours)
+
+    internal fun calculateFatigue(key: String, canonicalKey: String?, now: Long, tauHours: Int): Double {
+        if (tauHours <= 0) return 0.0
+        val f1 = calculateFatigueSingle(key, now, tauHours)
+        val f2 = if (!canonicalKey.isNullOrBlank() && canonicalKey != key) {
+            calculateFatigueSingle(canonicalKey, now, tauHours)
+        } else 0.0
+        return maxOf(f1, f2)
+    }
+
+    private fun calculateFatigueSingle(key: String, now: Long, tauHours: Int): Double {
         val events = snapshot[key] ?: return 0.0
         val tauMs = tauHours * 3600 * 1000.0
         var total = 0.0
@@ -367,7 +483,38 @@ class RepeatPolicyImpl(
         return total
     }
 
-    internal fun calculateAffinity(key: String): Double {
+    internal fun calculateRotationPenalty(key: String, canonicalKey: String?, now: Long): Double {
+        val r1 = calculateRotationWeightSingle(key, now)
+        val r2 = if (!canonicalKey.isNullOrBlank() && canonicalKey != key) {
+            calculateRotationWeightSingle(canonicalKey, now)
+        } else 0.0
+        val totalWeight = maxOf(r1, r2)
+        return (totalWeight * 0.15).coerceIn(0.0, 1.5)
+    }
+
+    private fun calculateRotationWeightSingle(key: String, now: Long): Double {
+        val events = snapshot[key] ?: return 0.0
+        val decayMs = RepeatConfig.ROTATION_DECAY_DAYS * 24 * 3600 * 1000.0
+        var total = 0.0
+        for (event in events) {
+            if (event.weight <= 0.0) continue
+            val dt = (now - event.playedAt).coerceAtLeast(0L)
+            total += event.weight * exp(-dt / decayMs)
+        }
+        return total
+    }
+
+    internal fun calculateAffinity(key: String): Double = calculateAffinity(key, null)
+
+    internal fun calculateAffinity(key: String, canonicalKey: String?): Double {
+        val a1 = calculateAffinitySingle(key)
+        val a2 = if (!canonicalKey.isNullOrBlank() && canonicalKey != key) {
+            calculateAffinitySingle(canonicalKey)
+        } else 0.0
+        return maxOf(a1, a2)
+    }
+
+    private fun calculateAffinitySingle(key: String): Double {
         val events = snapshot[key] ?: return 0.0
         val totalWeight = events.sumOf { it.weight }
         return (totalWeight / 3.0).coerceIn(0.0, 1.0)

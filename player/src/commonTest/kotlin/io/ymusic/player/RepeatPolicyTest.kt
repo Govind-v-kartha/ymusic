@@ -586,4 +586,90 @@ class RepeatPolicyTest {
         assertTrue(policy.isRested("vid_1", now))
         assertEquals(1.0, policy.calculateFatigue("vid_0", now, 3))
     }
+
+    private fun ytItemWithTitle(id: String, title: String, artist: String?) = PlayableItem.YtMedia(
+        videoId = id,
+        title = title,
+        artist = artist,
+        durationMs = 180_000L,
+    )
+
+    @Test
+    fun session_rule_blocks_tracks_played_earlier_in_current_session() {
+        val policy = RepeatPolicyImpl(Random(42))
+        policy.initSnapshot(emptyMap())
+
+        val items = listOf(
+            ytItem("vid_shape_1", "Ed Sheeran"),
+            ytItem("vid_other", "Another Artist"),
+        )
+        val now = 10_000_000L
+
+        // Auto-play Shape of You in this session
+        policy.recordAutoPlay(items[0].repeatKey, items[0].canonicalKey)
+
+        // Index 0 should be blocked by Layer 1 (Session rule); index 1 selected
+        val pick = policy.selectNextIndex(
+            candidates = listOf(0, 1),
+            items = items,
+            currentIndex = 0,
+            noRepeatHours = 48,
+            allowScoreReordering = true,
+            now = now + 60_000L,
+        )
+        assertEquals(1, pick)
+    }
+
+    @Test
+    fun canonical_key_blocks_alternative_upload_of_same_song() {
+        val policy = RepeatPolicyImpl(Random(42))
+        val now = 10_000_000L
+        val item1 = ytItemWithTitle("vid_official", "Shape of You (Official Music Video)", "Ed Sheeran")
+        val item2 = ytItemWithTitle("vid_remaster", "Shape of You [Audio]", "Ed Sheeran")
+        val item3 = ytItemWithTitle("vid_different", "Perfect", "Ed Sheeran")
+
+        // Record official video as played 2 hours ago with high weight
+        policy.recordEvent(item1.repeatKey, item1.canonicalKey, now - 2 * 3600_000L, 1.0)
+        policy.initSnapshot(mapOf(
+            item1.repeatKey to listOf(RepeatEvent(now - 2 * 3600_000L, 1.0, null, item1.canonicalKey)),
+            item1.canonicalKey to listOf(RepeatEvent(now - 2 * 3600_000L, 1.0, null, item1.canonicalKey)),
+        ))
+
+        val items = listOf(item2, item3)
+        // Candidate 0 is item2 (different videoId, but same canonicalKey "ed sheeran|shape of you")
+        val pick = policy.selectNextIndex(
+            candidates = listOf(0, 1),
+            items = items,
+            currentIndex = 0,
+            noRepeatHours = 48,
+            allowScoreReordering = true,
+            now = now,
+        )
+        // Item 2 must be blocked by fatigue on its canonical key; item 3 selected!
+        assertEquals(1, pick)
+    }
+
+    @Test
+    fun preload_recent_plays_activates_defense_immediately_before_snapshot() {
+        val policy = RepeatPolicyImpl(Random(42))
+        // Snapshot is empty / not yet loaded
+        policy.preloadRecentPlays(listOf("vid_recent", "ed sheeran|shape of you"))
+        policy.initSnapshot(emptyMap())
+
+        val items = listOf(
+            ytItemWithTitle("vid_recent", "Shape of You", "Ed Sheeran"),
+            ytItemWithTitle("vid_fresh", "Fresh Song", "New Artist"),
+        )
+
+        val pick = policy.selectNextIndex(
+            candidates = listOf(0, 1),
+            items = items,
+            currentIndex = 0,
+            noRepeatHours = 48,
+            allowScoreReordering = true,
+            now = 10_000_000L,
+        )
+        // Preloaded song is blocked in session and recent plays!
+        assertEquals(1, pick)
+    }
 }

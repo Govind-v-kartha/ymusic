@@ -11,7 +11,7 @@ import app.cash.sqldelight.db.SqlSchema
  * ([PlayAgainStore]).
  */
 object PlayHistorySchema : SqlSchema<QueryResult.Value<Unit>> {
-    override val version: Long get() = 7
+    override val version: Long get() = 8
 
     override fun create(driver: SqlDriver): QueryResult.Value<Unit> {
         driver.exec(
@@ -83,8 +83,13 @@ object PlayHistorySchema : SqlSchema<QueryResult.Value<Unit>> {
         }
         if (oldVersion < 6) {
             createRepeatEvents(driver)
-        } else if (oldVersion < 7) {
-            addRepeatEventsRestUntil(driver)
+        } else {
+            if (oldVersion < 7) {
+                addRepeatEventsRestUntil(driver)
+            }
+            if (oldVersion < 8) {
+                addRepeatEventsCanonicalKey(driver)
+            }
         }
         return QueryResult.Unit
     }
@@ -156,15 +161,22 @@ object PlayHistorySchema : SqlSchema<QueryResult.Value<Unit>> {
                 item_key TEXT NOT NULL,
                 played_at INTEGER NOT NULL,
                 weight REAL NOT NULL,
-                rest_until INTEGER
+                rest_until INTEGER,
+                canonical_key TEXT
             )
             """.trimIndent(),
         )
         driver.exec("CREATE INDEX idx_repeat_events_key ON repeat_events(item_key)")
+        driver.exec("CREATE INDEX idx_repeat_events_canonical_key ON repeat_events(canonical_key)")
     }
 
     private fun addRepeatEventsRestUntil(driver: SqlDriver) {
         driver.exec("ALTER TABLE repeat_events ADD COLUMN rest_until INTEGER")
+    }
+
+    private fun addRepeatEventsCanonicalKey(driver: SqlDriver) {
+        driver.exec("ALTER TABLE repeat_events ADD COLUMN canonical_key TEXT")
+        driver.exec("CREATE INDEX idx_repeat_events_canonical_key ON repeat_events(canonical_key)")
     }
 }
 

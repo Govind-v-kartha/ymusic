@@ -674,4 +674,15 @@
     <string name="settings_song_mix_hint">Balance familiar languages and mood flow in autoplay</string>
     <string name="settings_keep_mood">Keep mood</string>
     <string name="settings_keep_mood_hint">Match calm or energetic tempo with your music flow</string>
+
+    <string name="settings_no_repeat_8h">8 hours</string>
+    <string name="settings_no_repeat_48h">48 hours</string>
+    <string name="settings_no_repeat_7d">7 days</string>
+    <string name="settings_no_repeat_30d">30 days</string>
+    <string name="settings_preferred_language">Preferred content language</string>
+    <string name="settings_preferred_language_helper">Prioritizes matching language for radio and mix recommendations</string>
+    <string name="settings_language_malayalam">Malayalam</string>
+    <string name="settings_language_english">English</string>
+    <string name="settings_language_any">Any language</string>
+    <string name="playback_botguard_explanation">YouTube requires account verification. Try signing in via Settings, or wait a few minutes.</string>
 </resources>

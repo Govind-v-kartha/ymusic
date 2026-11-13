@@ -666,4 +666,15 @@
     <string name="settings_song_mix_hint">Balance familiar languages and mood flow in autoplay</string>
     <string name="settings_keep_mood">Keep mood</string>
     <string name="settings_keep_mood_hint">Match calm or energetic tempo with your music flow</string>
+
+    <string name="settings_no_repeat_8h">8 മണിക്കൂർ</string>
+    <string name="settings_no_repeat_48h">48 മണിക്കൂർ</string>
+    <string name="settings_no_repeat_7d">7 ദിവസം</string>
+    <string name="settings_no_repeat_30d">30 ദിവസം</string>
+    <string name="settings_preferred_language">തിരഞ്ഞെടുത്ത ഭാഷ</string>
+    <string name="settings_preferred_language_helper">റേഡിയോയിലും മിക്സിലും തിരഞ്ഞെടുത്ത ഭാഷ മുൻഗണന നൽകുന്നു</string>
+    <string name="settings_language_malayalam">മലയാളം</string>
+    <string name="settings_language_english">ഇംഗ്ലീഷ്</string>
+    <string name="settings_language_any">ഏതെങ്കിലും ഭാഷ</string>
+    <string name="playback_botguard_explanation">യൂട്യൂബ് അക്കൗണ്ട് സ്ഥിരീകരണം ആവശ്യപ്പെടുന്നു. ക്രമീകരണങ്ങളിൽ സൈൻ ഇൻ ചെയ്യുക, അല്ലെങ്കിൽ കുറച്ച് മിനിറ്റ് കാത്തിരിക്കുക.</string>
 </resources>
