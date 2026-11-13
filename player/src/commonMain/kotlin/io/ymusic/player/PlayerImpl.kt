@@ -320,7 +320,7 @@ internal class PlayerImpl(
         if (released) return
         val currentItem = controller.state.currentItem
         val playedMs = progress.value.positionMs
-        if (currentItem != null && playedMs < 30_000L) {
+        if (currentItem != null && playedMs < io.ymusic.player.repeat.RepeatConfig.QUICK_SKIP_THRESHOLD_MS) {
             mixPolicy?.onQuickSkip(currentItem, playedMs)
         }
         val pagePick = prepareNextIndex.takeIf { nextFromPage }

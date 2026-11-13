@@ -225,8 +225,10 @@ internal class QueueController(
         if (playHistory.size >= 2) {
             playHistory.removeAt(playHistory.lastIndex)
             val target = playHistory.last()
-            state = state.copy(currentIndex = target)
-            return target
+            if (target in items.indices) {
+                state = state.copy(currentIndex = target)
+                return target
+            }
         }
         if (state.shuffle) return null
         val prev = when {
@@ -234,7 +236,9 @@ internal class QueueController(
             state.loopMode == LoopMode.All -> items.lastIndex
             else -> return null
         }
-        advanceTo(prev)
+        state = state.copy(currentIndex = prev)
+        playHistory.clear()
+        playHistory += prev
         return prev
     }
 

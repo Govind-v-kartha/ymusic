@@ -284,4 +284,77 @@ class QueueControllerTest {
         assertEquals(4, q.previous())
         assertEquals(0, q.previous(), "previous returns to 0 before the playAt jump")
     }
+
+    @Test
+    fun previous_after_insert_items_at_index() {
+        // Queue: [0, 1, 2]. Play 0 -> advance to 1. History: [0, 1]
+        val q = controller(3, playIndex = 0)
+        assertEquals(1, q.advance(userInitiated = false))
+
+        // Insert 2 items at index 1: old items [1, 2] shift to [3, 4]
+        // Currently playing item was at 1, now at 3. History: [0, 3]
+        q.add(listOf(PlayableItem.LocalMedia("file:///ins1.mp3"), PlayableItem.LocalMedia("file:///ins2.mp3")), at = 1)
+        assertEquals(5, q.state.items.size)
+        assertEquals(3, q.state.currentIndex)
+
+        // Previous should return 0 (the earlier played song), not the newly inserted item at 2 or 1
+        assertEquals(0, q.previous())
+    }
+
+    @Test
+    fun previous_after_remove_at_played_and_unplayed() {
+        // Queue: [0, 1, 2, 3]. Play 0 -> advance 1 -> advance 2. History: [0, 1, 2]
+        val q = controller(4, playIndex = 0)
+        assertEquals(1, q.advance(userInitiated = false))
+        assertEquals(2, q.advance(userInitiated = false))
+
+        // Remove item at index 1 (which was played). History should remove 1 and shift 2 to 1 -> [0, 1]
+        q.removeAt(1)
+        assertEquals(3, q.state.items.size)
+        assertEquals(1, q.state.currentIndex)
+
+        // Previous from current (old 2, now 1) should return 0 (skipping deleted 1)
+        assertEquals(0, q.previous())
+    }
+
+    @Test
+    fun previous_after_move_reordering() {
+        // Queue: [0, 1, 2, 3]. Play 0 -> advance 1. History: [0, 1]
+        val q = controller(4, playIndex = 0)
+        assertEquals(1, q.advance(userInitiated = false))
+
+        // Move currently playing item 1 to end (index 3). History [0, 1] becomes [0, 3]
+        q.move(1, 3)
+        assertEquals(3, q.state.currentIndex)
+
+        // Advance to next track (linear 3 wraps or next; let's moveTo 2)
+        assertEquals(0, q.previous(), "previous from 3 returns 0 (the previous track in history)")
+    }
+
+    @Test
+    fun previous_after_add_next() {
+        // Queue: [0, 1, 2]. Play 0. Add 2 items to play next
+        val q = controller(3, playIndex = 0)
+        q.addNext(listOf(PlayableItem.LocalMedia("file:///next1.mp3"), PlayableItem.LocalMedia("file:///next2.mp3")))
+        // Items inserted at index 1 and 2. Old 1 and 2 become 3 and 4
+        // Advance to first play-next track (index 1)
+        assertEquals(1, q.advance(userInitiated = false))
+        assertEquals(1, q.state.currentIndex)
+
+        // Previous from play-next track returns 0 (the original track)
+        assertEquals(0, q.previous())
+    }
+
+    @Test
+    fun previous_after_clear_and_set_queue() {
+        val q = controller(3, playIndex = 0)
+        assertEquals(1, q.advance(userInitiated = false))
+        q.clear()
+        assertNull(q.previous())
+
+        q.setQueue(listOf(PlayableItem.LocalMedia("file:///new0.mp3"), PlayableItem.LocalMedia("file:///new1.mp3")), 1)
+        assertEquals(1, q.state.currentIndex)
+        // History only has 1, so linear predecessor returns 0
+        assertEquals(0, q.previous())
+    }
 }
