@@ -63,11 +63,12 @@ data class QueueMore(
     val resumeToken: String? = null,
 )
 
+private const val MAX_PLAY_HISTORY = 100
+
 /**
  * Pure queue/shuffle/loop logic — no coroutines, no engines. The facade calls a mutation, reads the
- * new [state], and decides whether to (re)load. Shuffle keeps a played-order history so `previous`
- * walks back through what actually played, and index remapping keeps that history valid across
- * add/move/remove.
+ * new [state], and decides whether to (re)load. Play history stack tracks reverse-order playback across
+ * all modes (linear, shuffle, radio, autoplay), and index remapping keeps it valid across add/move/remove.
  */
 internal class QueueController(
     private val random: Random = Random.Default,
@@ -79,8 +80,11 @@ internal class QueueController(
     var state: QueueState = QueueState()
         private set
 
-    /** Indices into [QueueState.items] in the order they played; last element is the current item. */
-    private val played = mutableListOf<Int>()
+    /** Chronological stack of played indices across all modes (bounded to [MAX_PLAY_HISTORY]). Last is current. */
+    private val playHistory = mutableListOf<Int>()
+
+    /** Items played in the current shuffle cycle. Cleared on shuffle toggle and cycle exhaustion. */
+    private val shufflePlayed = mutableSetOf<Int>()
 
     /** Indices queued by [addNext], played in order before any shuffle pick; a jump, move or remove clears it. */
     private val upNext = mutableListOf<Int>()
@@ -90,9 +94,13 @@ internal class QueueController(
     fun setQueue(items: List<PlayableItem>, playIndex: Int, queueId: String? = null) {
         val index = if (items.isEmpty()) -1 else playIndex.coerceIn(0, items.lastIndex)
         state = state.copy(items = items, currentIndex = index, queueId = queueId.takeIf { index >= 0 })
-        played.clear()
+        playHistory.clear()
+        shufflePlayed.clear()
         upNext.clear()
-        if (index >= 0) played += index
+        if (index >= 0) {
+            playHistory += index
+            shufflePlayed += index
+        }
     }
 
     fun setLoopMode(mode: LoopMode) {
@@ -102,12 +110,12 @@ internal class QueueController(
     /** Toggling shuffle restarts the played history from the current item. */
     fun setShuffle(enabled: Boolean) {
         state = state.copy(shuffle = enabled)
-        played.clear()
-        if (state.currentIndex >= 0) played += state.currentIndex
+        shufflePlayed.clear()
+        if (state.currentIndex >= 0) shufflePlayed += state.currentIndex
     }
 
     /** Items not yet played in the current shuffle cycle. */
-    fun unplayedCount(): Int = (state.items.indices - played.toSet()).size
+    fun unplayedCount(): Int = (state.items.indices - shufflePlayed).size
 
     /** Jump to [index]. False if out of bounds. */
     fun moveTo(index: Int): Boolean {
@@ -132,7 +140,7 @@ internal class QueueController(
             return if (state.shuffle) peekShuffled() else nextLinear()
         }
         val candidates: List<Int> = if (state.shuffle) {
-            val unplayed = items.indices - played.toSet()
+            val unplayed = items.indices - shufflePlayed
             if (unplayed.isNotEmpty()) unplayed.toList()
             else if (items.size > 1) (items.indices - state.currentIndex).toList()
             else items.indices.toList()
@@ -166,8 +174,8 @@ internal class QueueController(
 
     /** Make [index] (from [peekNext]) the current item, updating shuffle history. */
     fun commitNext(index: Int) {
-        val unplayed = state.items.indices - played.toSet()
-        if (state.shuffle && unplayed.isEmpty()) played.clear()
+        val unplayed = state.items.indices - shufflePlayed
+        if (state.shuffle && unplayed.isEmpty()) shufflePlayed.clear()
         val isExplicitUpNext = upNext.firstOrNull() == index
         val itemKey = state.items.getOrNull(index)?.repeatKey
         advanceTo(index)
@@ -187,19 +195,19 @@ internal class QueueController(
     }
 
     /**
-     * The item to go back to: the previously-played item under shuffle, the previous index otherwise
-     * (wrapping under [LoopMode.All]). Null when there is nothing before the current item.
+     * The item to go back to: the previously-played item in play history across all modes,
+     * falling back to linear predecessor / wrap if history is exhausted.
      */
     fun previous(): Int? {
         val items = state.items
         if (items.isEmpty()) return null
-        if (state.shuffle) {
-            if (played.size < 2) return null
-            played.removeAt(played.lastIndex)
-            val target = played.last()
+        if (playHistory.size >= 2) {
+            playHistory.removeAt(playHistory.lastIndex)
+            val target = playHistory.last()
             state = state.copy(currentIndex = target)
             return target
         }
+        if (state.shuffle) return null
         val prev = when {
             state.currentIndex > 0 -> state.currentIndex - 1
             state.loopMode == LoopMode.All -> items.lastIndex
@@ -233,7 +241,8 @@ internal class QueueController(
         val wasCurrent = at == state.currentIndex
         val items = state.items.toMutableList().also { it.removeAt(at) }
         upNext.clear()
-        played.removeAll { it == at }
+        shufflePlayed.remove(at)
+        playHistory.removeAll { it == at }
         remap { i -> if (i > at) i - 1 else i }
         val newCurrent = when {
             items.isEmpty() -> -1
@@ -242,8 +251,12 @@ internal class QueueController(
             else -> state.currentIndex
         }
         state = state.copy(items = items, currentIndex = newCurrent)
-        if (wasCurrent && newCurrent >= 0 && (played.isEmpty() || played.last() != newCurrent)) {
-            played += newCurrent
+        if (wasCurrent && newCurrent >= 0) {
+            shufflePlayed += newCurrent
+            if (playHistory.isEmpty() || playHistory.last() != newCurrent) {
+                playHistory += newCurrent
+                if (playHistory.size > MAX_PLAY_HISTORY) playHistory.removeAt(0)
+            }
         }
         return wasCurrent
     }
@@ -318,14 +331,21 @@ internal class QueueController(
 
     fun clear() {
         state = state.copy(items = emptyList(), currentIndex = -1, queueId = null)
-        played.clear()
+        playHistory.clear()
+        shufflePlayed.clear()
         upNext.clear()
     }
 
     private fun advanceTo(index: Int) {
         state = state.copy(currentIndex = index)
         upNext.remove(index)
-        if (played.isEmpty() || played.last() != index) played += index
+        shufflePlayed += index
+        if (playHistory.isEmpty() || playHistory.last() != index) {
+            playHistory += index
+            if (playHistory.size > MAX_PLAY_HISTORY) {
+                playHistory.removeAt(0)
+            }
+        }
     }
 
     private fun nextLinear(): Int? {
@@ -339,7 +359,7 @@ internal class QueueController(
 
     private fun peekShuffled(): Int? {
         val all = state.items.indices
-        val unplayed = all - played.toSet()
+        val unplayed = all - shufflePlayed
         if (unplayed.isNotEmpty()) return unplayed.elementAt(random.nextInt(unplayed.size))
         if (state.loopMode != LoopMode.All) return null
         // Every item played: restart the shuffle cycle, avoiding an immediate repeat when possible.
@@ -348,7 +368,10 @@ internal class QueueController(
     }
 
     private fun remap(shift: (Int) -> Int) {
-        for (i in played.indices) played[i] = shift(played[i])
+        for (i in playHistory.indices) playHistory[i] = shift(playHistory[i])
+        val remappedShuffle = shufflePlayed.map(shift).toMutableSet()
+        shufflePlayed.clear()
+        shufflePlayed.addAll(remappedShuffle)
         for (i in upNext.indices) upNext[i] = shift(upNext[i])
     }
 }

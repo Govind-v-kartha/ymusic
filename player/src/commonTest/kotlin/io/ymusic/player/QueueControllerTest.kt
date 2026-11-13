@@ -189,4 +189,99 @@ class QueueControllerTest {
         assertTrue(q.moveTo(1))
         assertEquals(1, q.state.currentIndex)
     }
+
+    @Test
+    fun next_x3_then_previous_x3_returns_exact_earlier_songs() {
+        val q = controller(6, playIndex = 0)
+        assertEquals(1, q.advance(userInitiated = false))
+        assertEquals(2, q.advance(userInitiated = false))
+        assertEquals(3, q.advance(userInitiated = false))
+        assertEquals(3, q.state.currentIndex)
+
+        assertEquals(2, q.previous())
+        assertEquals(1, q.previous())
+        assertEquals(0, q.previous())
+    }
+
+    @Test
+    fun previous_with_blocked_candidates_in_between() {
+        val q = controller(6, playIndex = 0)
+        var step = 0
+        val fakePolicy = object : io.ymusic.player.repeat.RepeatPolicy {
+            override val isReady: Boolean = true
+            override val hasHistory: Boolean = false
+            override fun initSnapshot(snapshot: Map<String, List<io.ymusic.player.repeat.RepeatEvent>>) {}
+            override fun recordEvent(key: String, playedAt: Long, weight: Double) {}
+            override fun recordAutoPlay(key: String) {}
+            override fun hasEventInWindow(key: String, windowMs: Long, now: Long): Boolean = false
+            override fun restItem(key: String, restUntil: Long) {}
+            override fun clearRest(key: String) {}
+            override fun isRested(key: String, now: Long): Boolean = false
+            override fun restUntil(key: String, now: Long): Long? = null
+            override fun clearAll() {}
+            override fun selectNextIndex(
+                candidates: List<Int>,
+                items: List<PlayableItem>,
+                currentIndex: Int,
+                noRepeatHours: Int,
+                allowScoreReordering: Boolean,
+                isExempt: (PlayableItem) -> Boolean,
+                now: Long,
+                onFallbackNotice: (() -> Unit)?,
+            ): Int? {
+                step++
+                return if (step == 1) 2 else 5 // Skip 1 -> pick 2, then skip 3,4 -> pick 5
+            }
+        }
+        q.repeatPolicy = fakePolicy
+        assertEquals(2, q.advance(userInitiated = false))
+        assertEquals(5, q.advance(userInitiated = false))
+        assertEquals(5, q.state.currentIndex)
+
+        assertEquals(2, q.previous(), "must return 2 (skipping 4, 3)")
+        assertEquals(0, q.previous(), "must return 0 (skipping 1)")
+    }
+
+    @Test
+    fun previous_with_shuffle_on() {
+        val q = controller(5, playIndex = 0, seed = 42)
+        q.setShuffle(true)
+        val p1 = q.advance(userInitiated = false)!!
+        val p2 = q.advance(userInitiated = false)!!
+        val p3 = q.advance(userInitiated = false)!!
+
+        assertEquals(p2, q.previous())
+        assertEquals(p1, q.previous())
+        assertEquals(0, q.previous())
+        assertNull(q.previous(), "exhausted history under shuffle returns null")
+    }
+
+    @Test
+    fun previous_with_radio_refill_between() {
+        val q = controller(2, playIndex = 0)
+        assertEquals(1, q.advance(userInitiated = false))
+
+        // Radio refills page of new items at the tail
+        q.add(listOf(PlayableItem.LocalMedia("file:///2.mp3"), PlayableItem.LocalMedia("file:///3.mp3")))
+        assertEquals(4, q.state.items.size)
+        assertEquals(1, q.state.currentIndex)
+
+        assertEquals(2, q.advance(userInitiated = false))
+        assertEquals(2, q.state.currentIndex)
+
+        assertEquals(1, q.previous(), "previous crosses refill boundary back to original page")
+        assertEquals(0, q.previous())
+    }
+
+    @Test
+    fun previous_after_play_at() {
+        val q = controller(6, playIndex = 0)
+        assertTrue(q.moveTo(4))
+        assertEquals(4, q.state.currentIndex)
+        assertEquals(5, q.advance(userInitiated = false))
+        assertEquals(5, q.state.currentIndex)
+
+        assertEquals(4, q.previous())
+        assertEquals(0, q.previous(), "previous returns to 0 before the playAt jump")
+    }
 }
