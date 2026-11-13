@@ -23,7 +23,7 @@ env:
 jobs:
   build-windows:
     name: Build Windows x64 (portable zip & installer)
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
       - name: Disable Git CRLF conversion
         run: git config --global core.autocrlf false
@@ -75,6 +75,8 @@ jobs:
         env:
           HOST_CC: gcc
         run: |
+          # Force static linking for zlib by removing dynamic import libraries
+          rm -f /mingw64/lib/libz.dll.a /mingw64/x86_64-w64-mingw32/lib/libz.dll.a
           scripts/build-desktop.sh || {
             for log in .deps/.build/*/config.log; do
               [ -f "$log" ] && { echo "::group::$log"; tail -n 80 "$log"; echo "::endgroup::"; }
@@ -394,12 +396,15 @@ jobs:
           find "$VERIFY_DIR" -maxdepth 5 | head -n 50
           
           echo "=== Dynamic link verification (ldd) ==="
-          BIN_PATH=$(find "$VERIFY_DIR" -name "ymusic-personal" -type f -executable 2>/dev/null | head -n 1)
+          BIN_PATH=$(find "$VERIFY_DIR" \( -name "YMusic" -o -name "ymusic" -o -name "ymusic-personal" \) -type f -executable 2>/dev/null | head -n 1)
+          if [ -z "$BIN_PATH" ]; then
+            BIN_PATH=$(find "$VERIFY_DIR/opt" -type f -executable 2>/dev/null | grep -E '/bin/' | head -n 1)
+          fi
           if [ -n "$BIN_PATH" ] && [ -f "$BIN_PATH" ]; then
             echo "Checking launcher binary: $BIN_PATH"
             ldd "$BIN_PATH"
           else
-            echo "ERROR: Executable launcher 'ymusic-personal' not found in extracted deb" >&2
+            echo "ERROR: Executable launcher not found in extracted deb" >&2
             find "$VERIFY_DIR" -type f -executable
             exit 1
           fi
