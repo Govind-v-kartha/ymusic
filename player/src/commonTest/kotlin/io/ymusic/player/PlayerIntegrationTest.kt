@@ -427,9 +427,15 @@ class PlayerIntegrationTest {
 
         var quickSkippedItem: PlayableItem? = null
         var quickSkippedWasAuto: Boolean? = null
+        var restEventCount = 0
         h.player.onTrackQuickSkipped = { item, isAuto ->
             quickSkippedItem = item
             quickSkippedWasAuto = isAuto
+            if (isAuto) {
+                restEventCount++
+                val now = Clock.System.now().toEpochMilliseconds()
+                repeatPolicy.restItem(item.repeatKey, now + io.ymusic.player.repeat.RepeatConfig.SKIP_REST_DURATION_MS)
+            }
         }
 
         // Set queue with trackManual (manual selection)
@@ -461,6 +467,7 @@ class PlayerIntegrationTest {
 
         assertEquals(trackAuto, quickSkippedItem)
         assertEquals(true, quickSkippedWasAuto)
+        assertEquals(1, restEventCount, "Quick skip must create exactly one rest event")
         assertTrue(repeatPolicy.isRested(trackAuto.repeatKey, now2))
         val restUntil = repeatPolicy.restUntil(trackAuto.repeatKey, now2)
         assertNotNull(restUntil)

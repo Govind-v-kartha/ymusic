@@ -328,11 +328,6 @@ internal class PlayerImpl(
         if (currentItem != null && playedMs < io.ymusic.player.repeat.RepeatConfig.QUICK_SKIP_THRESHOLD_MS) {
             val isAuto = controller.isCurrentItemAutoPicked
             mixPolicy?.onQuickSkip(currentItem, playedMs)
-            if (isAuto) {
-                val now = Clock.System.now().toEpochMilliseconds()
-                val restUntil = now + io.ymusic.player.repeat.RepeatConfig.SKIP_REST_DURATION_MS
-                repeatPolicy?.restItem(currentItem.repeatKey, restUntil)
-            }
             onTrackQuickSkipped?.invoke(currentItem, isAuto)
         }
         val pagePick = prepareNextIndex.takeIf { nextFromPage }
