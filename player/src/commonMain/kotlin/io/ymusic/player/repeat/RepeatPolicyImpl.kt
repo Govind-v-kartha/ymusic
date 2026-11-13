@@ -32,10 +32,19 @@ class RepeatPolicyImpl(
             this.restedUntil.clear()
             if (!pendingClear) {
                 snapshot.forEach { (key, events) ->
-                    this.snapshot[key] = events.toMutableList()
+                    this.snapshot.getOrPut(key) { mutableListOf() }.addAll(events)
+                    events.forEach { event ->
+                        val cKey = event.canonicalKey
+                        if (!cKey.isNullOrBlank() && cKey != key) {
+                            this.snapshot.getOrPut(cKey) { mutableListOf() }.add(event)
+                        }
+                    }
                     val activeRest = events.mapNotNull { it.restUntil }.maxOrNull()
                     if (activeRest != null) {
                         this.restedUntil[key] = activeRest
+                        events.mapNotNull { it.canonicalKey }.forEach { cKey ->
+                            this.restedUntil[cKey] = activeRest
+                        }
                     }
                 }
             }

@@ -101,6 +101,7 @@ internal class QueueController(
         if (index >= 0) {
             playHistory += index
             shufflePlayed += index
+            items.getOrNull(index)?.let { mixPolicy?.onManualPlay(it) }
         }
     }
 
@@ -144,7 +145,7 @@ internal class QueueController(
         if (policy == null || !policy.isReady) {
             return if (state.shuffle) peekShuffled() else nextLinear()
         }
-        val candidates: List<Int> = if (state.shuffle) {
+        val candidates: List<Int> = if (state.shuffle || isRadioOrAutoplay()) {
             val unplayed = items.indices - shufflePlayed
             if (unplayed.isNotEmpty()) unplayed.toList()
             else if (items.size > 1) (items.indices - state.currentIndex).toList()

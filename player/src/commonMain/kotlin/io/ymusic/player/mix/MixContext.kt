@@ -92,6 +92,8 @@ class MixContext {
      */
     fun isTargetDeficit(): Boolean {
         return synchronized(lock) {
+            val targets = autoPickWindow.count { it }
+            if (targets < 2) return@synchronized true
             val discoveryCount = autoPickWindow.count { !it }
             if (discoveryCount >= 2) return@synchronized true
             if (autoPickWindow.isNotEmpty() && !autoPickWindow.last()) return@synchronized true
