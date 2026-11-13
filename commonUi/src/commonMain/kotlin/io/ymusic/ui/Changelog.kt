@@ -51,6 +51,17 @@ data class ChangelogEntry(
 object ChangelogStore {
     private const val BUNDLED_JSON = """[
   {
+    "id": 7,
+    "version": "Playback navigation and repeat fix",
+    "date": "2026-11-13",
+    "notes": [
+      "Previous button goes back to exact earlier songs in reverse play order",
+      "Repeat protection survives restarts and recognizes other uploads of same song",
+      "Quick-skipped automatic song rests for an hour",
+      "Clearer message for YouTube verification error"
+    ]
+  },
+  {
     "id": 5,
     "version": "Language and mood autoplay mix",
     "date": "2026-11-03",
