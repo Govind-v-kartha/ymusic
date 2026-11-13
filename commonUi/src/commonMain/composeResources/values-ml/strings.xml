@@ -676,5 +676,6 @@
     <string name="settings_language_malayalam">മലയാളം</string>
     <string name="settings_language_english">ഇംഗ്ലീഷ്</string>
     <string name="settings_language_any">ഏതെങ്കിലും ഭാഷ</string>
-    <string name="playback_botguard_explanation">യൂട്യൂബ് അക്കൗണ്ട് സ്ഥിരീകരണം ആവശ്യപ്പെടുന്നു. ക്രമീകരണങ്ങളിൽ സൈൻ ഇൻ ചെയ്യുക, അല്ലെങ്കിൽ കുറച്ച് മിനിറ്റ് കാത്തിരിക്കുക.</string>
+    <string name="playback_botguard_explanation">YouTube verification required. Please try again later or update the app.
+Code: %1$s</string>
 </resources>

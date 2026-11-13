@@ -1142,7 +1142,7 @@ internal fun playerErrorText(error: io.ymusic.player.PlayerError): UiText = when
     error.code == io.ymusic.player.PlayerError.FILE_MISSING -> UiText.Resource(Res.string.playback_file_missing)
     error.code == io.ymusic.player.PlayerError.FOLDER_ACCESS_LOST -> UiText.Resource(Res.string.playback_folder_access_lost)
     error.code == io.ymusic.player.PlayerError.VIDEO_DECODER_FAILED -> UiText.Resource(Res.string.playback_video_unsupported)
-    error.code == io.ymusic.player.PlayerError.PO_TOKEN_REJECTED -> UiText.Resource(Res.string.playback_botguard_explanation)
+    error.code == io.ymusic.player.PlayerError.PO_TOKEN_REJECTED -> UiText.Resource(Res.string.playback_botguard_explanation, error.code ?: "PO_TOKEN_REJECTED")
     else -> error.userMessage?.let(UiText::Plain) ?: when (error.playability()) {
         Playability.SignInRequired -> UiText.Resource(Res.string.playback_sign_in_required)
         Playability.Unavailable -> UiText.Resource(Res.string.playback_unavailable)

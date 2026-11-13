@@ -692,5 +692,6 @@
     <string name="settings_language_malayalam">Malayalam</string>
     <string name="settings_language_english">English</string>
     <string name="settings_language_any">Any language</string>
-    <string name="playback_botguard_explanation">YouTube requires account verification. Try signing in via Settings, or wait a few minutes.</string>
+    <string name="playback_botguard_explanation">YouTube verification required. Please try again later or update the app.
+Code: %1$s</string>
 </resources>

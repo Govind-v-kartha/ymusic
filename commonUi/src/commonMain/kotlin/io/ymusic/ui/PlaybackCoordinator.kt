@@ -312,7 +312,7 @@ class PlaybackCoordinator(
         val history = playHistory ?: return
         scope.launch {
             try {
-                history.insertRepeatEvent(key, now, weight, canonicalKey)
+                history.insertRepeatEvent(itemKey = key, canonicalKey = canonicalKey, playedAt = now, weight = weight)
             } catch (c: kotlinx.coroutines.CancellationException) {
                 throw c
             } catch (e: Exception) {
@@ -331,7 +331,7 @@ class PlaybackCoordinator(
         val history = playHistory ?: return
         scope.launch {
             try {
-                history.insertRepeatRest(key, now, restUntil, canonicalKey)
+                history.insertRepeatRest(itemKey = key, canonicalKey = canonicalKey, playedAt = now, restUntil = restUntil)
             } catch (c: kotlinx.coroutines.CancellationException) {
                 throw c
             } catch (e: Exception) {
