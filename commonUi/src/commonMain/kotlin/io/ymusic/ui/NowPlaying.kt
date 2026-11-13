@@ -206,6 +206,7 @@ import io.ymusic.ui.resources.menu_speed_pitch
 import io.ymusic.ui.resources.menu_start_radio
 import io.ymusic.ui.resources.play_again_track_of
 import io.ymusic.ui.resources.playback_add_folder_again
+import io.ymusic.ui.resources.playback_botguard_explanation
 import io.ymusic.ui.resources.playback_botguard_failed
 import io.ymusic.ui.resources.playback_failed
 import io.ymusic.ui.resources.playback_file_missing
@@ -1141,7 +1142,7 @@ internal fun playerErrorText(error: io.ymusic.player.PlayerError): UiText = when
     error.code == io.ymusic.player.PlayerError.FILE_MISSING -> UiText.Resource(Res.string.playback_file_missing)
     error.code == io.ymusic.player.PlayerError.FOLDER_ACCESS_LOST -> UiText.Resource(Res.string.playback_folder_access_lost)
     error.code == io.ymusic.player.PlayerError.VIDEO_DECODER_FAILED -> UiText.Resource(Res.string.playback_video_unsupported)
-    error.code == io.ymusic.player.PlayerError.PO_TOKEN_REJECTED -> UiText.Resource(Res.string.playback_botguard_failed)
+    error.code == io.ymusic.player.PlayerError.PO_TOKEN_REJECTED -> UiText.Resource(Res.string.playback_botguard_explanation)
     else -> error.userMessage?.let(UiText::Plain) ?: when (error.playability()) {
         Playability.SignInRequired -> UiText.Resource(Res.string.playback_sign_in_required)
         Playability.Unavailable -> UiText.Resource(Res.string.playback_unavailable)
