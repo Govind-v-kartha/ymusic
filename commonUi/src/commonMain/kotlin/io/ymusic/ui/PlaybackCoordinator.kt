@@ -76,7 +76,22 @@ class PlaybackCoordinator(
         }
         player.onTrackQuickSkipped = { item, isAutoPicked ->
             if (isAutoPicked) {
-                restItem(item, RepeatConfig.SKIP_REST_DURATION_MS)
+                val history = playHistory
+                if (history != null) {
+                    val key = item.repeatKey
+                    val canonicalKey = item.canonicalKey
+                    val now = Clock.System.now().toEpochMilliseconds()
+                    val restUntil = now + RepeatConfig.SKIP_REST_DURATION_MS
+                    scope.launch {
+                        try {
+                            history.insertRepeatRest(itemKey = key, canonicalKey = canonicalKey, playedAt = now, restUntil = restUntil)
+                        } catch (c: kotlinx.coroutines.CancellationException) {
+                            throw c
+                        } catch (e: Exception) {
+                            log?.log(Logger.Level.WARN, "insertRepeatRest failed", e)
+                        }
+                    }
+                }
                 log?.log(Logger.Level.INFO, "Auto-picked track quick-skipped (<10s), resting for 1h: ${item.repeatKey}")
             } else {
                 log?.log(Logger.Level.DEBUG, "Manual track quick-skipped, no rest: ${item.repeatKey}")

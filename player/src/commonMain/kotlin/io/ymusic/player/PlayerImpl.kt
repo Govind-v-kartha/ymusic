@@ -327,6 +327,16 @@ internal class PlayerImpl(
         val playedMs = progress.value.positionMs
         if (currentItem != null && playedMs < io.ymusic.player.repeat.RepeatConfig.QUICK_SKIP_THRESHOLD_MS) {
             val isAuto = controller.isCurrentItemAutoPicked
+            if (isAuto) {
+                val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
+                val restUntil = now + io.ymusic.player.repeat.RepeatConfig.SKIP_REST_DURATION_MS
+                val rep = repeatPolicy
+                if (rep is io.ymusic.player.repeat.RepeatPolicyImpl) {
+                    rep.restItem(currentItem.repeatKey, currentItem.canonicalKey, restUntil)
+                } else {
+                    rep?.restItem(currentItem.repeatKey, restUntil)
+                }
+            }
             mixPolicy?.onQuickSkip(currentItem, playedMs)
             onTrackQuickSkipped?.invoke(currentItem, isAuto)
         }

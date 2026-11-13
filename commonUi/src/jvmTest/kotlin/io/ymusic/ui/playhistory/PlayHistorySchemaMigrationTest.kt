@@ -85,4 +85,53 @@ class PlayHistorySchemaMigrationTest {
         }, 0)
         driver.close()
     }
+
+    @Test
+    fun quick_skip_records_exactly_one_rest_event_in_history_store() = kotlinx.coroutines.test.runTest {
+        val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+        PlayHistorySchema.create(driver)
+        val historyStore = PlayHistoryStore(driver)
+
+        val key = "yt:song_quick_skipped"
+        val canonicalKey = "song_quick_skipped"
+        val now = 1_000_000L
+        val restUntil = now + 3600_000L
+
+        // Simulate coordinator's persistence write for a quick-skipped track
+        historyStore.insertRepeatRest(
+            itemKey = key,
+            canonicalKey = canonicalKey,
+            playedAt = now,
+            restUntil = restUntil,
+        )
+
+        // Query database directly to assert exactly 1 row
+        var rowCount = 0
+        var storedItemKey: String? = null
+        var storedCanonicalKey: String? = null
+        var storedRestUntil: Long? = null
+
+        driver.executeQuery(
+            null,
+            "SELECT item_key, canonical_key, rest_until FROM repeat_events WHERE item_key = ?",
+            { cursor ->
+                while (cursor.next().value) {
+                    rowCount++
+                    storedItemKey = cursor.getString(0)
+                    storedCanonicalKey = cursor.getString(1)
+                    storedRestUntil = cursor.getLong(2)
+                }
+                app.cash.sqldelight.db.QueryResult.Unit
+            },
+            1,
+        ) {
+            bindString(0, key)
+        }
+
+        assertEquals(1, rowCount, "Exactly one rest row must be stored for a quick skip")
+        assertEquals(key, storedItemKey)
+        assertEquals(canonicalKey, storedCanonicalKey)
+        assertEquals(restUntil, storedRestUntil)
+        driver.close()
+    }
 }

@@ -427,15 +427,12 @@ class PlayerIntegrationTest {
 
         var quickSkippedItem: PlayableItem? = null
         var quickSkippedWasAuto: Boolean? = null
-        var restEventCount = 0
+        var autoQuickSkipCount = 0
+        var manualQuickSkipCount = 0
         h.player.onTrackQuickSkipped = { item, isAuto ->
             quickSkippedItem = item
             quickSkippedWasAuto = isAuto
-            if (isAuto) {
-                restEventCount++
-                val now = Clock.System.now().toEpochMilliseconds()
-                repeatPolicy.restItem(item.repeatKey, now + io.ymusic.player.repeat.RepeatConfig.SKIP_REST_DURATION_MS)
-            }
+            if (isAuto) autoQuickSkipCount++ else manualQuickSkipCount++
         }
 
         // Set queue with trackManual (manual selection)
@@ -453,6 +450,8 @@ class PlayerIntegrationTest {
 
         assertEquals(trackManual, quickSkippedItem)
         assertEquals(false, quickSkippedWasAuto)
+        assertEquals(1, manualQuickSkipCount)
+        assertEquals(0, autoQuickSkipCount)
         assertFalse(repeatPolicy.isRested(trackManual.repeatKey, now1))
 
         // Current item is now trackAuto, which was reached via auto-advance / advance in queue
@@ -467,10 +466,15 @@ class PlayerIntegrationTest {
 
         assertEquals(trackAuto, quickSkippedItem)
         assertEquals(true, quickSkippedWasAuto)
-        assertEquals(1, restEventCount, "Quick skip must create exactly one rest event")
-        assertTrue(repeatPolicy.isRested(trackAuto.repeatKey, now2))
+        assertEquals(1, autoQuickSkipCount, "Auto quick skip must occur exactly once")
+        assertEquals(1, manualQuickSkipCount, "Manual quick skip must occur exactly once")
+        assertTrue(repeatPolicy.isRested(trackAuto.repeatKey, now2), "PlayerImpl must synchronously rest auto-picked track")
         val restUntil = repeatPolicy.restUntil(trackAuto.repeatKey, now2)
         assertNotNull(restUntil)
         assertTrue(restUntil >= now2 + 3500_000L) // ~1 hour rest
+
+        // Next item is trackNext, NEVER the rested trackAuto
+        assertEquals("track_next", (h.player.queue.value.currentItem as? PlayableItem.YtMedia)?.videoId)
+        assertNotEquals("track_auto", (h.player.queue.value.currentItem as? PlayableItem.YtMedia)?.videoId)
     }
 }
