@@ -19,8 +19,13 @@ class MixPolicyImpl(
         get() = keepMoodEnabled()
 
     override fun onManualPlay(item: PlayableItem) {
-        val seedContext = Language.fromCode(preferredLanguage()).takeIf { it != Language.UNKNOWN }
-        val lang = LanguageClassifier.classify(item.displayTitle, item.artistName, artistLanguageStore, seedContext)
+        var lang = LanguageClassifier.classify(item.displayTitle, item.artistName, artistLanguageStore, contextLanguage = null)
+        if (lang == Language.UNKNOWN) {
+            val pref = Language.fromCode(preferredLanguage())
+            if (pref != Language.UNKNOWN) {
+                lang = pref
+            }
+        }
         val mood = MoodClassifier.classify(item.displayTitle, item.artistName)
 
         // Only record observation for artist if direct script/keywords were unambiguous

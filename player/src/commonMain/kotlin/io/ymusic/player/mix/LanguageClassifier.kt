@@ -12,74 +12,90 @@ object LanguageClassifier {
         Regex("""(?i)\b(english)\b""") to Language.ENGLISH,
     )
 
-    private val MALAYALAM_CHANNEL_OR_LABEL_PATTERNS = Regex(
-        """(?i)\b(muzik247|satyam\s*(?:jukebox|audios)?|saregama\s*malayalam|millennium\s*audios|manorama\s*music|goodwill\s*entertainments|mathrubhumi|speed\s*audio\s*malayalam|saina\s*music|east\s*coast)\b"""
-    )
-
-    private val MALAYALAM_ARTIST_PATTERNS = Regex(
-        """(?i)\b(k\.?\s*j\.?\s*yesudas|yesudas|k\.?\s*s\.?\s*chithra|chithra|m\.?\s*g\.?\s*sreekumar|sreekumar|sushin\s*shyam|hesham\s*abdul\s*wahab|jassie\s*gift|vineeth\s*sreenivasan|sujatha\s*mohan|shaan\s*rahman|gopi\s*sundar|deepak\s*dev|vidyasagar|raveendran|ouseppachan|bijibal|m\.?\s*jayachandran|job\s*kurian|sachin\s*warrier|unni\s*menon|madhu\s*balakrishnan)\b"""
-    )
-
-    private val MALAYALAM_ROMANIZED_KEYWORDS = Regex(
-        """(?i)\b(pennu|kannu|premam|moham|kalyanam|paattu|pattu|gaanam|swapnam|thumbi|oru|njan|ninne|ente|sneham|mazha|kaathu|aaradhike|aradhike|malare|kadavath|poove|vathikkalu|vathil|chundathu|uyire|neeyilla|neram|manikya|malaraya|poovi|kadhakal|thaamara|venal|kaattil|ormakal|manassin|kanmani|priyasakhi|shantham|hridayam|aalroopam|alroopam|illatha|jeevitham|kanneer|snehamodu|theeram|vinnile|kaate|puzha|cheru|punchiri)\b"""
-    )
-
-    private val COMMON_ENGLISH_WORDS = Regex(
-        """(?i)\b(the|and|for|with|you|your|from|this|that|have|what|when|where|who|will|all|would|there|their)\b"""
-    )
-
     fun classify(
         title: String?,
         artist: String? = null,
         artistStore: LearnedArtistLanguageStore? = null,
         contextLanguage: Language? = null,
     ): Language {
-        val combined = listOfNotNull(title, artist).joinToString(" ")
+        val combined = listOfNotNull(title, artist).joinToString(" ").lowercase()
         if (combined.isBlank()) return contextLanguage ?: Language.UNKNOWN
 
-        // 1. Direct Unicode Script Detection (highest priority)
+        // 1. Direct Unicode Script Detection (highest priority - STRONG = 2)
         val scriptLang = detectScript(combined)
         if (scriptLang != null) return scriptLang
 
-        // 2. Keyword detection in title / artist tags
+        // 2. Explicit Keyword tags (e.g. "[Malayalam Song]", "(Tamil Video)") - STRONG = 2
         for ((pattern, lang) in KEYWORD_PATTERNS) {
             if (pattern.containsMatchIn(combined)) {
                 return lang
             }
         }
 
-        // 3. Known Malayalam channel / label / artist hints
-        if (MALAYALAM_CHANNEL_OR_LABEL_PATTERNS.containsMatchIn(combined) ||
-            MALAYALAM_ARTIST_PATTERNS.containsMatchIn(combined)
-        ) {
-            return Language.MALAYALAM
-        }
-
-        // 4. Romanized Malayalam word patterns
-        if (MALAYALAM_ROMANIZED_KEYWORDS.containsMatchIn(combined)) {
-            return Language.MALAYALAM
-        }
-
-        // 5. Learned artist / channel dictionary
+        // 3. Learned artist / channel dictionary (STRONG = 2 if decisive)
         if (artist != null && artistStore != null) {
             artistStore.getDecisiveLanguage(artist)?.let { return it }
         }
 
-        // 6. Context inheritance: if seed song is Malayalam, and no English stop words dominate
-        if (contextLanguage != null && contextLanguage != Language.UNKNOWN) {
-            if (!COMMON_ENGLISH_WORDS.containsMatchIn(combined)) {
-                return contextLanguage
+        // 4. Evidence scoring for Indic languages (Strong = 2, Weak = 1, Threshold >= 2)
+        val scores = mutableMapOf<Language, Int>()
+
+        // Check Exclusive Channels / Labels (Strong = 2)
+        LanguageStarterData.EXCLUSIVE_LABELS.forEach { (lang, labels) ->
+            if (labels.any { combined.contains(it) }) {
+                scores[lang] = (scores[lang] ?: 0) + 2
             }
         }
 
-        // 7. Fallback: check if predominantly English text
-        if (COMMON_ENGLISH_WORDS.containsMatchIn(combined)) {
-            return Language.ENGLISH
+        // Check Strong Vocabulary (Strong = 2)
+        LanguageStarterData.STRONG_VOCABULARY.forEach { (lang, words) ->
+            if (words.any { word -> Regex("""\b${Regex.escape(word)}\b""").containsMatchIn(combined) }) {
+                scores[lang] = (scores[lang] ?: 0) + 2
+            }
         }
-        if (hasLatinScript(combined)) {
+
+        // Check Multilingual Artists (Weak = 1)
+        LanguageStarterData.MULTILINGUAL_ARTISTS.forEach { (lang, artists) ->
+            if (artists.any { art -> combined.contains(art) }) {
+                scores[lang] = (scores[lang] ?: 0) + 1
+            }
+        }
+
+        // Check Shared Vocabulary (Weak = 1)
+        LanguageStarterData.SHARED_VOCABULARY.forEach { (lang, words) ->
+            if (words.any { word -> Regex("""\b${Regex.escape(word)}\b""").containsMatchIn(combined) }) {
+                scores[lang] = (scores[lang] ?: 0) + 1
+            }
+        }
+
+        // Best scoring Indic language with score >= 2 wins
+        val bestIndic = scores.filter { it.value >= 2 }.maxByOrNull { it.value }?.key
+        if (bestIndic != null) {
+            return bestIndic
+        }
+
+        // If score is 1 (single weak signal) and contextLanguage matches that language:
+        if (contextLanguage != null && (scores[contextLanguage] ?: 0) >= 1) {
+            return contextLanguage
+        }
+
+        // 5. Positive English Detection (words or recognized English artists):
+        val hasEnglishWord = LanguageStarterData.ENGLISH_POSITIVE_WORDS.any { word ->
+            Regex("""\b${Regex.escape(word)}\b""").containsMatchIn(combined)
+        }
+        val hasEnglishArtist = LanguageStarterData.ENGLISH_ARTISTS.any { art ->
+            combined.contains(art)
+        }
+        if (hasEnglishWord || hasEnglishArtist) {
             return Language.ENGLISH
         }
 
+        // 6. Inherit contextLanguage if available and non-unknown
+        if (contextLanguage != null && contextLanguage != Language.UNKNOWN) {
+            return contextLanguage
+        }
+
+        // 7. Latin script with no evidence is UNKNOWN (NEVER default to English!)
         return Language.UNKNOWN
     }
 
@@ -100,29 +116,34 @@ object LanguageClassifier {
                 in 0x0C00..0x0C7F -> telugu++
                 in 0x0C80..0x0CFF -> kannada++
                 in 0x0900..0x097F -> devanagari++
-                in 0x0600..0x06FF, in 0x0750..0x077F, in 0x08A0..0x08FF -> arabic++
+                in 0x0600..0x06FF -> arabic++
                 in 0x4E00..0x9FFF, in 0x3040..0x30FF, in 0xAC00..0xD7AF -> cjk++
             }
         }
 
-        val counts = listOf(
-            Language.MALAYALAM to malayalam,
-            Language.TAMIL to tamil,
-            Language.TELUGU to telugu,
-            Language.KANNADA to kannada,
-            Language.HINDI to devanagari,
-            Language.ARABIC to arabic,
-            Language.OTHER to cjk,
-        ).filter { it.second >= 2 }
+        val max = maxOf(malayalam, tamil, telugu, kannada, devanagari, arabic, cjk)
+        if (max < 3) return null
 
-        return counts.maxByOrNull { it.second }?.first
+        return when (max) {
+            malayalam -> Language.MALAYALAM
+            tamil -> Language.TAMIL
+            telugu -> Language.TELUGU
+            kannada -> Language.KANNADA
+            devanagari -> Language.HINDI
+            arabic -> Language.ARABIC
+            else -> null
+        }
     }
 
-    private fun hasLatinScript(text: String): Boolean {
-        var latin = 0
+    fun hasLatinScript(text: String): Boolean {
+        var count = 0
         for (ch in text) {
-            if (ch in 'A'..'Z' || ch in 'a'..'z') latin++
+            val code = ch.code
+            if ((code in 0x0041..0x005A) || (code in 0x0061..0x007A)) {
+                count++
+                if (count >= 3) return true
+            }
         }
-        return latin >= 3
+        return false
     }
 }
